@@ -114,9 +114,9 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# Cargar variables de entorno
+# Cargar variables de entorno (Local y Cloud)
 load_dotenv()
-api_key = os.getenv("GOOGLE_API_KEY")
+api_key = st.secrets.get("GOOGLE_API_KEY") or os.getenv("GOOGLE_API_KEY")
 
 # Configuración de Gemini
 client = None
@@ -153,7 +153,7 @@ if "chat_session" not in st.session_state:
     if client:
         try:
             st.session_state.chat_session = client.chats.create(
-                model='gemini-2.5-flash',
+                model='gemini-2.0-flash',
                 config=genai.types.GenerateContentConfig(system_instruction=SYSTEM_INSTRUCTION_CHATBOT)
             )
         except: st.session_state.chat_session = None
@@ -469,7 +469,7 @@ def main():
                     context = get_comuna_context(st.session_state.comuna_id, "Desconocida", extra_context=extra)
                     with st.spinner("Analizando micro-entorno..."):
                         rec = client.models.generate_content(
-                            model='gemini-2.5-flash', 
+                            model='gemini-2.0-flash', 
                             contents=f"Contexto Territorial Extendido: {json.dumps(context)}", 
                             config=genai.types.GenerateContentConfig(system_instruction=SYSTEM_INSTRUCTION_RADAR)
                         )
@@ -547,7 +547,7 @@ def main():
                         
                         with st.spinner("Consultando algoritmos de inteligencia territorial..."):
                             sim_resp = client.models.generate_content(
-                                model='gemini-2.5-flash', 
+                                model='gemini-2.0-flash', 
                                 contents=f"NEGOCIO: {idea} | CONTEXTO: {json.dumps(ctx_sim)}", 
                                 config=genai.types.GenerateContentConfig(system_instruction=SYSTEM_INSTRUCTION_SIMULATOR)
                             )
