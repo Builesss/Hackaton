@@ -114,17 +114,30 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# Cargar variables de entorno (Local y Cloud)
+# Cargar variables de entorno (Resiliencia Local + Cloud)
 load_dotenv()
-api_key = st.secrets.get("GOOGLE_API_KEY") or os.getenv("GOOGLE_API_KEY")
+api_key = os.getenv("GOOGLE_API_KEY")
 
-# Configuración de Gemini
-client = None
-if api_key and api_key != "INSERT_YOUR_GEMINI_API_KEY_HERE":
+# Si no hay clave local, intentar buscar en los secretos de Streamlit (Cloud)
+if not api_key:
     try:
-        client = genai.Client(api_key=api_key)
+        if "GOOGLE_API_KEY" in st.secrets:
+            api_key = st.secrets["GOOGLE_API_KEY"]
+    except Exception:
+        api_key = None
+
+# Configuración de Gemini (Estabilizado con Cache de Recursos)
+@st.cache_resource
+def get_gemini_client(_api_key):
+    if not _api_key or _api_key == "INSERT_YOUR_GEMINI_API_KEY_HERE":
+        return None
+    try:
+        return genai.Client(api_key=_api_key)
     except Exception as e:
         st.error(f"Error inicializando Gemini: {e}")
+        return None
+
+client = get_gemini_client(api_key)
         
 SYSTEM_INSTRUCTION_RADAR = (
     "Eres un Analista Senior de Desarrollo Económico y Turismo en Medellín. "
@@ -148,18 +161,22 @@ SYSTEM_INSTRUCTION_SIMULATOR = (
     "4. 💡 RECOMENDACIÓN DE IMPACTO."
 )
 
-# Sesión de Chat
-if "chat_session" not in st.session_state:
-    if client:
-        try:
-            st.session_state.chat_session = client.chats.create(
-                model='gemini-2.0-flash',
-                config=genai.types.GenerateContentConfig(system_instruction=SYSTEM_INSTRUCTION_CHATBOT)
-            )
-        except: st.session_state.chat_session = None
-    else: st.session_state.chat_session = None
+# Sesión de Chat (Mantenimiento de Sesión)
+def get_chat_session(_client):
+    if not _client: return None
+    try:
+        return _client.chats.create(
+            model='gemini-1.5-flash',
+            config=genai.types.GenerateContentConfig(system_instruction=SYSTEM_INSTRUCTION_CHATBOT)
+        )
+    except: return None
+
+if "chat_session" not in st.session_state or st.session_state.chat_session is None:
+    st.session_state.chat_session = get_chat_session(client)
 
 if "messages" not in st.session_state: st.session_state.messages = []
+if "radar_insight" not in st.session_state: st.session_state.radar_insight = None
+if "last_sim" not in st.session_state: st.session_state.last_sim = None
 
 # --- CARGAS DE DATOS (REPROYECTADOS WGS84) ---
 @st.cache_data
@@ -467,15 +484,21 @@ def main():
                     }
                     
                     context = get_comuna_context(st.session_state.comuna_id, "Desconocida", extra_context=extra)
-                    with st.spinner("Analizando micro-entorno..."):
-                        rec = client.models.generate_content(
-                            model='gemini-2.0-flash', 
-                            contents=f"Contexto Territorial Extendido: {json.dumps(context)}", 
-                            config=genai.types.GenerateContentConfig(system_instruction=SYSTEM_INSTRUCTION_RADAR)
-                        )
-                        st.info("🎯 Insights de Inteligencia Territorial:")
-                        with st.container(height=350):
-                            st.markdown(rec.text)
+                    try:
+                        with st.spinner("Analizando micro-entorno..."):
+                            rec = client.models.generate_content(
+                                model='gemini-1.5-flash', 
+                                contents=f"Contexto Territorial Extendido: {json.dumps(context)}", 
+                                config=genai.types.GenerateContentConfig(system_instruction=SYSTEM_INSTRUCTION_RADAR)
+                            )
+                            st.session_state.radar_insight = rec.text
+                    except Exception as e:
+                        st.warning("🏮 El motor analítico está saturado por la alta demanda. Por favor, reintenta en 15 segundos.")
+                
+                if st.session_state.radar_insight:
+                    st.info("🎯 Insights de Inteligencia Territorial:")
+                    with st.container(height=350):
+                        st.markdown(st.session_state.radar_insight)
 
     # --------------------------
     # TAB 2: ANALYTICS BI
@@ -545,13 +568,16 @@ def main():
                             "top_actividades": p_sim['sector'].value_counts().head(5).to_dict() if not p_sim.empty and 'sector' in p_sim.columns else {}
                         }
                         
-                        with st.spinner("Consultando algoritmos de inteligencia territorial..."):
-                            sim_resp = client.models.generate_content(
-                                model='gemini-2.0-flash', 
-                                contents=f"NEGOCIO: {idea} | CONTEXTO: {json.dumps(ctx_sim)}", 
-                                config=genai.types.GenerateContentConfig(system_instruction=SYSTEM_INSTRUCTION_SIMULATOR)
-                            )
-                            st.session_state.last_sim = sim_resp.text
+                        try:
+                            with st.spinner("Consultando algoritmos de inteligencia territorial..."):
+                                sim_resp = client.models.generate_content(
+                                    model='gemini-1.5-flash', 
+                                    contents=f"NEGOCIO: {idea} | CONTEXTO: {json.dumps(ctx_sim)}", 
+                                    config=genai.types.GenerateContentConfig(system_instruction=SYSTEM_INSTRUCTION_SIMULATOR)
+                                )
+                                st.session_state.last_sim = sim_resp.text
+                        except Exception as e:
+                            st.warning("⚠️ Error de cuota: El simulador está saturado. Reintenta en breve.")
                     else:
                         st.warning("Por favor, describe tu idea para realizar la simulación.")
 
