@@ -6,13 +6,12 @@ from folium.plugins import MarkerCluster, HeatMap
 from streamlit_folium import st_folium
 import json
 import os
-import requests
 from dotenv import load_dotenv
-from google import genai
+from openai import OpenAI
 from services.data_client import get_comuna_context
 
 # Configuración de Streamlit
-st.set_page_config(page_title="DataMede - Inteligencia Territorial", layout="wide", page_icon="🌍")
+st.set_page_config(page_title="GeoMed - Inteligencia Territorial", layout="wide", page_icon="🌍")
 
 # Inyectar CSS Avanzado (UX/UI Premium B2B - Glassmorphism)
 st.markdown("""
@@ -116,63 +115,58 @@ st.markdown("""
 
 # Cargar variables de entorno (Resiliencia Local + Cloud)
 load_dotenv()
-api_key = os.getenv("GOOGLE_API_KEY")
+api_key = os.getenv("OPENROUTER_API_KEY")
 
 # Si no hay clave local, intentar buscar en los secretos de Streamlit (Cloud)
 if not api_key:
     try:
-        if "GOOGLE_API_KEY" in st.secrets:
-            api_key = st.secrets["GOOGLE_API_KEY"]
+        if "OPENROUTER_API_KEY" in st.secrets:
+            api_key = st.secrets["OPENROUTER_API_KEY"]
     except Exception:
         api_key = None
 
-# Configuración de Gemini (Estabilizado con Cache de Recursos)
+# Configuración de OpenRouter (Estabilizado con Cache de Recursos)
 @st.cache_resource
-def get_gemini_client(_api_key):
-    if not _api_key or _api_key == "INSERT_YOUR_GEMINI_API_KEY_HERE":
+def get_ai_client(_api_key):
+    if not _api_key:
         return None
     try:
-        return genai.Client(api_key=_api_key)
-    except Exception as e:
-        st.error(f"Error inicializando Gemini: {e}")
-        return None
-
-client = get_gemini_client(api_key)
-        
-SYSTEM_INSTRUCTION_RADAR = (
-    "Eres un Analista Senior de Desarrollo Económico y Turismo en Medellín. "
-    "Tu objetivo es identificar 'Huecos de Mercado' y oportunidades de negocio competitivas. "
-    "Analiza la cercanía a estaciones de Metro, atractivos turísticos, puntos de información y el mix de comercios. "
-    "Sugiere 3 ideas de negocio disruptivas. Sé muy profesional y usa datos para justificar."
-)
-
-SYSTEM_INSTRUCTION_CHATBOT = (
-    "Eres un Consultor Experto en Emprendimiento e Inteligencia Territorial en Medellín. "
-    "Ayudas a validar y mejorar ideas de negocio usando datos de transporte (Metro), turismo y competencia local."
-)
-
-SYSTEM_INSTRUCTION_SIMULATOR = (
-    "Eres el 'Algoritmo de Viabilidad DataMede'. Tu función es evaluar ideas de negocio en Medellín. "
-    "Recibirás contexto de transporte, turismo y competencia. Debes dar un Score de Éxito del 0 al 100%. "
-    "Sé crítico pero constructivo. Estructura tu respuesta así: "
-    "1. 📈 SCORE DE ÉXITO: [X]% \n"
-    "2. 🧩 ANÁLISIS DE ENTORNO: (Relación con Metro/Turismo/Competencia) \n"
-    "3. ⚠️ RIESGOS DETECTADOS \n"
-    "4. 💡 RECOMENDACIÓN DE IMPACTO."
-)
-
-# Sesión de Chat (Mantenimiento de Sesión)
-def get_chat_session(_client):
-    if not _client: return None
-    try:
-        return _client.chats.create(
-            model='gemini-1.5-flash',
-            config=genai.types.GenerateContentConfig(system_instruction=SYSTEM_INSTRUCTION_CHATBOT)
+        return OpenAI(
+            base_url="https://openrouter.ai/api/v1",
+            api_key=_api_key,
         )
-    except: return None
+    except Exception as e:
+        st.error(f"Error inicializando OpenRouter: {e}")
+        return None
 
-if "chat_session" not in st.session_state or st.session_state.chat_session is None:
-    st.session_state.chat_session = get_chat_session(client)
+client = get_ai_client(api_key)
+# Lista de modelos para redundancia (Resiliencia en Hackathon)
+MODELS = ["openrouter/free", "meta-llama/llama-3.3-70b-instruct:free", "google/gemma-3-12b-it:free"]
+MODEL_NAME = MODELS[0]
+
+        
+# Función para generar contenido via OpenRouter con redundancia
+def generate_ai_content(prompt, system_instruction):
+    if not client: return "Error: Cliente AI no configurado."
+    
+    last_error = ""
+    for model_id in MODELS:
+        try:
+            response = client.chat.completions.create(
+                model=model_id,
+                messages=[
+                    {"role": "system", "content": system_instruction},
+                    {"role": "user", "content": prompt}
+                ]
+            )
+            return response.choices[0].message.content
+        except Exception as e:
+            last_error = str(e)
+            if "429" in last_error:
+                continue # Intentar con el siguiente modelo si hay rate limit
+            return f"Error en generación: {last_error}"
+            
+    return f"Todos los modelos gratuitos están saturados. Intenta de nuevo en unos segundos. (Detalle: {last_error})"
 
 if "messages" not in st.session_state: st.session_state.messages = []
 if "radar_insight" not in st.session_state: st.session_state.radar_insight = None
@@ -219,23 +213,25 @@ def load_tur_info():
     if not os.path.exists(path): return None
     with open(path, "r", encoding="utf-8") as f: return json.load(f)
 
-def filter_data_by_comuna(all_features, comuna_id):
-    if all_features is None or not comuna_id: 
-        return [] if not isinstance(all_features, pd.DataFrame) else pd.DataFrame(columns=['lat', 'lon', 'nombre', 'comuna', 'clase'])
+def filter_df_by_comuna(df, comuna_id):
+    if not isinstance(df, pd.DataFrame) or df.empty or not comuna_id:
+        return pd.DataFrame(columns=['lat', 'lon', 'nombre', 'comuna', 'sector'])
     
-    # Normalizar ID de búsqueda: quitar ceros a la izquierda y espacios
     target_id = str(comuna_id).strip().lstrip('0')
-    if target_id == "": target_id = "0" 
+    if target_id == "": target_id = "0"
     
-    # Caso DataFrame (POIs / Establecimientos)
-    if isinstance(all_features, pd.DataFrame):
-        # Normalizar columna 'comuna' al vuelo para el match (soporta '07', ' 7', etc)
-        mask = all_features['comuna'].astype(str).str.strip().str.lstrip('0') == target_id
-        return all_features[mask].copy()
+    mask = df['comuna'].astype(str).str.strip().str.lstrip('0') == target_id
+    return df[mask].copy()
+
+def filter_geojson_by_comuna(features, comuna_id):
+    if not features or not comuna_id:
+        return []
     
-    # Caso Lista de Características (GeoJSON) - Capas de transporte/barrios
+    target_id = str(comuna_id).strip().lstrip('0')
+    if target_id == "": target_id = "0"
+    
     filtered = []
-    for f in all_features:
+    for f in features:
         props = f.get('properties', {})
         val = props.get('comuna', props.get('cod_comuna', props.get('comuna_corregimiento', '')))
         cid = str(val).strip().lstrip('0')
@@ -256,7 +252,7 @@ SECTOR_MAP = {
 
 # Mapa de categorías a sectores amigables para el filtro
 def get_macro_sectores(df):
-    if df.empty or 'sector' not in df.columns: return []
+    if not isinstance(df, pd.DataFrame) or df.empty or 'sector' not in df.columns: return []
     # Filtrar valores None o vacíos
     raw_sectors = [str(s) for s in df['sector'].unique() if s is not None and str(s).strip() != "" and str(s).lower() != 'none']
     # Mapear a nombres reales
@@ -264,7 +260,7 @@ def get_macro_sectores(df):
     return named_sectors
 
 def get_comuna_stats(df_comuna):
-    if df_comuna is None or df_comuna.empty:
+    if not isinstance(df_comuna, pd.DataFrame) or df_comuna.empty:
         return {
             "total": 0, 
             "top_cat": "N/A", 
@@ -296,10 +292,10 @@ def get_comuna_stats(df_comuna):
 def main():
     col_logo, col_title = st.columns([1, 10])
     with col_logo:
-        try: st.image(r"C:\Users\sebas\.gemini\antigravity\brain\ea3dc383-e02e-4950-a9b4-742239326c6d\datamede_logo_1774369419475.png", width=70)
-        except: st.markdown("🚀")
+        # Usar un logo genérico o el emoji si el archivo no existe
+        st.markdown("## 🌍")
     with col_title:
-        st.markdown("<h1 style='margin-bottom:0;'>DataMede Intelligence</h1>", unsafe_allow_html=True)
+        st.markdown("<h1 style='margin-bottom:0;'>GeoMed Intelligence</h1>", unsafe_allow_html=True)
         st.markdown("<p style='color:#94A3B8; margin-top:0;'>Geointeligencia y Analítica para el Ecosistema de Medellín</p>", unsafe_allow_html=True)
     st.divider()
 
@@ -339,10 +335,10 @@ def main():
             st.rerun()
 
     # Filtrar datos de la comuna seleccionada (ULTRA RÁPIDO con Pandas)
-    poi_comuna = filter_data_by_comuna(all_pois_df, st.session_state.comuna_id)
+    poi_comuna = filter_df_by_comuna(all_pois_df, st.session_state.comuna_id)
     
     # Si hay filtros de sector activados, revertir nombres a códigos para filtrar
-    if selected_sectors and 'sector' in poi_comuna.columns:
+    if selected_sectors and not poi_comuna.empty and 'sector' in poi_comuna.columns:
         REVERSE_MAP = {v: k for k, v in SECTOR_MAP.items()}
         selected_codes = [REVERSE_MAP.get(s, s) for s in selected_sectors]
         poi_comuna = poi_comuna[poi_comuna['sector'].isin(selected_codes)]
@@ -355,126 +351,115 @@ def main():
 
     # Tabs Principal (Expansión para Hackathon)
     tab1, tab2, tab3, tab4 = st.tabs(["🗺️ Radar Territorial", "📊 Análisis BI", "🧪 Simulador Éxito", "💡 Consultoría IA"])
-
-    # --------------------------
     # TAB 1: RADAR (MAPA)
     # --------------------------
     with tab1:
-        c1, c2 = st.columns([3, 1])
-        with c1:
-            # Crear mapa base con Estilo Dark (Esri World Dark Gray) para máxima compatibilidad
-            # Limitamos el zoom máximo nativo para evitar el error "Map data not yet available"
-            m = folium.Map(location=[6.2442, -75.5812], zoom_start=12, tiles=None, max_zoom=20)
-            folium.TileLayer(
-                tiles="https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}",
-                attr="Esri",
-                name="🌃 Medellín Tech (Oscuro)",
-                max_zoom=20,
-                max_native_zoom=16,
-                overlay=False,
-                control=True
+        # 1. Mapa Base (Ancho completo)
+        # Crear mapa base con Estilo Dark (Esri World Dark Gray) para máxima compatibilidad
+        m = folium.Map(location=[6.2442, -75.5812], zoom_start=12, tiles=None, max_zoom=20)
+        folium.TileLayer(
+            tiles="https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}",
+            attr="Esri",
+            name="🌃 Medellín Tech (Oscuro)",
+            max_zoom=20,
+            max_native_zoom=16,
+            overlay=False,
+            control=True
+        ).add_to(m)
+        
+        # Capas del Mapa
+        if geojson_comunas:
+            folium.GeoJson(
+                geojson_comunas, 
+                name="🚩 Comunas de Medellín",
+                style_function=lambda x: {'fillColor': '#01FF84', 'color': '#01FF84', 'weight': 1, 'fillOpacity': 0.05}, 
+                highlight_function=lambda x: {'weight': 3, 'color': '#FFFFFF', 'fillOpacity': 0.2}, 
+                tooltip=folium.GeoJsonTooltip(fields=['nombre','comuna'], aliases=['Comuna:','Cod:'])
             ).add_to(m)
-            
-            # 1. Capa Comunas
-            if geojson_comunas:
-                folium.GeoJson(
-                    geojson_comunas, 
-                    name="🚩 Comunas de Medellín",
-                    style_function=lambda x: {'fillColor': '#01FF84', 'color': '#01FF84', 'weight': 1, 'fillOpacity': 0.05}, 
-                    highlight_function=lambda x: {'weight': 3, 'color': '#FFFFFF', 'fillOpacity': 0.2}, 
-                    tooltip=folium.GeoJsonTooltip(fields=['nombre','comuna'], aliases=['Comuna:','Cod:'])
-                ).add_to(m)
-            
-            if st.session_state.comuna_id:
-                # 2. Barrios
-                if all_barrios:
-                    barrios_comuna = filter_data_by_comuna(all_barrios['features'], st.session_state.comuna_id)
-                    if barrios_comuna:
-                        folium.GeoJson(
-                            {"type":"FeatureCollection","features":barrios_comuna}, 
-                            name="🏘️ Barrios Locales",
-                            style_function=lambda x: {'color':'#FBBF24', 'weight':1, 'dashArray':'5,5', 'fillOpacity':0}, 
-                            tooltip=folium.GeoJsonTooltip(fields=['nombre_barrio'], aliases=['Barrio-Vereda:'])
-                        ).add_to(m)
-                
-                # 3. Comercios (POIs) + HeatMap de Oportunidad
-                if not poi_comuna.empty:
-                    # Capa de Cluster (Puntos individuales)
-                    fg_pois = folium.FeatureGroup(name="🏪 Establecimientos (POIs)")
-                    cluster = MarkerCluster().add_to(fg_pois)
-                    df_map = poi_comuna.head(500) # Límite para puntos individuales
-                    for _, row in df_map.iterrows():
-                        folium.CircleMarker(location=[row['lat'], row['lon']], radius=3, color="#01FF84", fill=True, tooltip=f"<b>{row['nombre']}</b>").add_to(cluster)
-                    fg_pois.add_to(m)
-                    
-                    # Capa de HeatMap (Densidad/Saturación)
-                    heat_data = poi_comuna[['lat', 'lon']].values.tolist()
-                    HeatMap(heat_data, name="🔥 Heatmap de Saturación", radius=15, blur=10, min_opacity=0.3).add_to(m)
-
-            
-            # 4. Capa de Metro (Nodos de Flujo Peatonal)
-            if metro_data:
-                folium.GeoJson(
-                    metro_data,
-                    name="🚇 Estaciones de Metro",
-                    marker=folium.CircleMarker(radius=7, color='#FF1493', fill=True, fillOpacity=1, fill_color='#FFFFFF', weight=2),
-                    tooltip=folium.GeoJsonTooltip(fields=['label', 'linea'], aliases=['🚇 Estación:', 'Línea:'])
-                ).add_to(m)
-
-            # 5. Capa de Atractivos Turísticos
-            if attraction_data:
-                atr_filtrados = filter_data_by_comuna(attraction_data['features'], st.session_state.comuna_id) if st.session_state.comuna_id else attraction_data['features']
-                if atr_filtrados:
+        
+        if st.session_state.comuna_id:
+            if all_barrios:
+                barrios_comuna = filter_geojson_by_comuna(all_barrios['features'], st.session_state.comuna_id)
+                if barrios_comuna:
                     folium.GeoJson(
-                        {"type":"FeatureCollection","features":atr_filtrados},
-                        name="🌟 Atractivos Turísticos",
-                        marker=folium.Marker(icon=folium.Icon(color='orange', icon='star')),
-                        tooltip=folium.GeoJsonTooltip(fields=['nombre_sitio', 'tipo_atractivo'], aliases=['🌟 Atractivo:', 'Tipo:'])
+                        {"type":"FeatureCollection","features":barrios_comuna}, 
+                        name="🏘️ Barrios Locales",
+                        style_function=lambda x: {'color':'#FBBF24', 'weight':1, 'dashArray':'5,5', 'fillOpacity':0}, 
+                        tooltip=folium.GeoJsonTooltip(fields=['nombre_barrio'], aliases=['Barrio-Vereda:'])
                     ).add_to(m)
-
-            # 6. Capa de Puntos de Info Turística
-            if tur_info_data:
-                folium.GeoJson(
-                    tur_info_data,
-                    name="ℹ️ Info Turística",
-                    show=False, # Apagada por defecto para no saturar
-                    marker=folium.Marker(icon=folium.Icon(color='blue', icon='info-sign')),
-                    tooltip=folium.GeoJsonTooltip(fields=['sitio', 'direccion'], aliases=['ℹ️ Punto Info:', 'Dir:'])
-                ).add_to(m)
             
-            # EL MENÚ DENTRO DEL MAPA
-            folium.LayerControl(collapsed=False, position='topright').add_to(m)
+            if not poi_comuna.empty:
+                fg_pois = folium.FeatureGroup(name="🏪 Establecimientos (POIs)")
+                cluster = MarkerCluster().add_to(fg_pois)
+                df_map = poi_comuna.head(500)
+                for _, row in df_map.iterrows():
+                    folium.CircleMarker(location=[row['lat'], row['lon']], radius=3, color="#01FF84", fill=True, tooltip=f"<b>{row['nombre']}</b>").add_to(cluster)
+                fg_pois.add_to(m)
                 
-            # Estabilización del componente st_folium para evitar que desaparezca
-            map_event = st_folium(
-                m, 
-                width="100%", 
-                height=550, 
-                key="radar_medellin_v3", 
-                returned_objects=["last_active_drawing"]
-            )
-            
-            if map_event and map_event.get("last_active_drawing"):
-                new_cid = str(map_event["last_active_drawing"]["properties"].get("comuna")).strip()
-                if new_cid != st.session_state.comuna_id:
-                    st.session_state.comuna_id = new_cid
-                    st.rerun()
+                heat_data = poi_comuna[['lat', 'lon']].values.tolist()
+                HeatMap(heat_data, name="🔥 Heatmap de Saturación", radius=15, blur=10, min_opacity=0.3).add_to(m)
 
-        with c2:
-            st.markdown("### 🗺️ Capas Dinámicas")
-            st.info("Utilice el selector dentro del mapa para activar el Heatmap de saturación comercial.")
+        if metro_data:
+            folium.GeoJson(
+                metro_data,
+                name="🚇 Estaciones de Metro",
+                marker=folium.CircleMarker(radius=7, color='#FF1493', fill=True, fillOpacity=1, fill_color='#FFFFFF', weight=2),
+                tooltip=folium.GeoJsonTooltip(fields=['label', 'linea'], aliases=['🚇 Estación:', 'Línea:'])
+            ).add_to(m)
+
+        if attraction_data:
+            atr_filtrados = filter_geojson_by_comuna(attraction_data['features'], st.session_state.comuna_id) if st.session_state.comuna_id else attraction_data['features']
+            if atr_filtrados:
+                folium.GeoJson(
+                    {"type":"FeatureCollection","features":atr_filtrados},
+                    name="🌟 Atractivos Turísticos",
+                    marker=folium.Marker(icon=folium.Icon(color='orange', icon='star')),
+                    tooltip=folium.GeoJsonTooltip(fields=['nombre_sitio', 'tipo_atractivo'], aliases=['🌟 Atractivo:', 'Tipo:'])
+                ).add_to(m)
+
+        if tur_info_data:
+            folium.GeoJson(
+                tur_info_data,
+                name="ℹ️ Info Turística",
+                show=False,
+                marker=folium.Marker(icon=folium.Icon(color='blue', icon='info-sign')),
+                tooltip=folium.GeoJsonTooltip(fields=['sitio', 'direccion'], aliases=['ℹ️ Punto Info:', 'Dir:'])
+            ).add_to(m)
+        
+        folium.LayerControl(collapsed=False, position='topright').add_to(m)
             
+        map_event = st_folium(
+            m, 
+            width="100%", 
+            height=550, 
+            key="radar_medellin_v3", 
+            returned_objects=["last_active_drawing"]
+        )
+        
+        if map_event and map_event.get("last_active_drawing"):
+            new_cid = str(map_event["last_active_drawing"]["properties"].get("comuna")).strip()
+            if new_cid != st.session_state.comuna_id:
+                st.session_state.comuna_id = new_cid
+                st.rerun()
+
+        # 2. Panel Inferior (Insights y Controles)
+        st.divider()
+        col_info, col_ai = st.columns([1, 2])
+        
+        with col_info:
+            st.markdown("### 🗺️ Entorno Local")
             if st.session_state.comuna_id:
                 st.markdown(f"<div class='metric-card'>📍 <b>Comuna {st.session_state.comuna_id}</b><br>{cnombres.get(st.session_state.comuna_id, '')}</div>", unsafe_allow_html=True)
-                
-                # Resumen rápido
                 st.metric("Puntos Comerciales", f"{len(poi_comuna):,}")
-                
-                if st.button("🌟 Ver Oportunidades IA", use_container_width=True):
-                    # Recolectar contexto local extendido
-                    metro_cercano = filter_data_by_comuna(metro_data['features'], st.session_state.comuna_id) if metro_data else []
-                    atr_cercanos = filter_data_by_comuna(attraction_data['features'], st.session_state.comuna_id) if attraction_data else []
-                    inf_cercanos = filter_data_by_comuna(tur_info_data['features'], st.session_state.comuna_id) if tur_info_data else []
+                st.info("💡 Usa el mapa para explorar la densidad comercial y nodos de transporte.")
+
+        with col_ai:
+            if st.session_state.comuna_id:
+                st.markdown("### 🌟 Inteligencia Territorial")
+                if st.button("🚀 Generar Insights Estratégicos", use_container_width=True):
+                    metro_cercano = filter_geojson_by_comuna(metro_data['features'], st.session_state.comuna_id) if metro_data else []
+                    atr_cercanos = filter_geojson_by_comuna(attraction_data['features'], st.session_state.comuna_id) if attraction_data else []
+                    inf_cercanos = filter_geojson_by_comuna(tur_info_data['features'], st.session_state.comuna_id) if tur_info_data else []
                     
                     extra = {
                         "metro": [m['properties'].get('label') for m in metro_cercano],
@@ -485,19 +470,20 @@ def main():
                     
                     context = get_comuna_context(st.session_state.comuna_id, "Desconocida", extra_context=extra)
                     try:
-                        with st.spinner("Analizando micro-entorno..."):
-                            rec = client.models.generate_content(
-                                model='gemini-1.5-flash', 
-                                contents=f"Contexto Territorial Extendido: {json.dumps(context)}", 
-                                config=genai.types.GenerateContentConfig(system_instruction=SYSTEM_INSTRUCTION_RADAR)
+                        with st.spinner("Analizando micro-entorno con IA..."):
+                            SYSTEM_INSTRUCTION_RADAR = (
+                                "Eres un Analista Senior de Desarrollo Económico y Turismo en Medellín. "
+                                "Tu objetivo es identificar 'Huecos de Mercado' y oportunidades de negocio competitivas. "
+                                "Analiza la cercanía a estaciones de Metro, atractivos turísticos, puntos de información y el mix de comercios. "
+                                "Sugiere 3 ideas de negocio disruptivas. Sé muy profesional y usa datos para justificar."
                             )
-                            st.session_state.radar_insight = rec.text
+                            res = generate_ai_content(f"Contexto Territorial Extendido: {json.dumps(context)}", SYSTEM_INSTRUCTION_RADAR)
+                            st.session_state.radar_insight = res
                     except Exception as e:
-                        st.warning("🏮 El motor analítico está saturado por la alta demanda. Por favor, reintenta en 15 segundos.")
+                        st.warning("🏮 El motor analítico está saturado. Por favor, reintenta en unos segundos.")
                 
                 if st.session_state.radar_insight:
-                    st.info("🎯 Insights de Inteligencia Territorial:")
-                    with st.container(height=350):
+                    with st.container(height=350, border=True):
                         st.markdown(st.session_state.radar_insight)
 
     # --------------------------
@@ -558,8 +544,8 @@ def main():
                 
                 if st.button("🚀 Calcular Probabilidad de Éxito", use_container_width=True):
                     if idea:
-                        p_sim = filter_data_by_comuna(all_pois_df, sim_comuna)
-                        m_sim = filter_data_by_comuna(metro_data['features'], sim_comuna) if metro_data else []
+                        p_sim = filter_df_by_comuna(all_pois_df, sim_comuna)
+                        m_sim = filter_geojson_by_comuna(metro_data['features'], sim_comuna) if metro_data else []
                         
                         ctx_sim = {
                             "comuna": cnombres.get(sim_comuna, "Desconocida"),
@@ -570,12 +556,17 @@ def main():
                         
                         try:
                             with st.spinner("Consultando algoritmos de inteligencia territorial..."):
-                                sim_resp = client.models.generate_content(
-                                    model='gemini-1.5-flash', 
-                                    contents=f"NEGOCIO: {idea} | CONTEXTO: {json.dumps(ctx_sim)}", 
-                                    config=genai.types.GenerateContentConfig(system_instruction=SYSTEM_INSTRUCTION_SIMULATOR)
+                                SYSTEM_INSTRUCTION_SIMULATOR = (
+                                    "Eres el 'Algoritmo de Viabilidad DataMede'. Tu función es evaluar ideas de negocio en Medellín. "
+                                    "Recibirás contexto de transporte, turismo y competencia. Debes dar un Score de Éxito del 0 al 100%. "
+                                    "Sé crítico pero constructivo. Estructura tu respuesta así: "
+                                    "1. 📈 SCORE DE ÉXITO: [X]% \n"
+                                    "2. 🧩 ANÁLISIS DE ENTORNO: (Relación con Metro/Turismo/Competencia) \n"
+                                    "3. ⚠️ RIESGOS DETECTADOS \n"
+                                    "4. 💡 RECOMENDACIÓN DE IMPACTO."
                                 )
-                                st.session_state.last_sim = sim_resp.text
+                                sim_resp = generate_ai_content(f"NEGOCIO: {idea} | CONTEXTO: {json.dumps(ctx_sim)}", SYSTEM_INSTRUCTION_SIMULATOR)
+                                st.session_state.last_sim = sim_resp
                         except Exception as e:
                             st.warning("⚠️ Error de cuota: El simulador está saturado. Reintenta en breve.")
                     else:
@@ -605,12 +596,35 @@ def main():
             st.session_state.messages.append({"role": "user", "content": prompt})
             with st.chat_message("user"): st.markdown(prompt)
             
-            if st.session_state.chat_session:
+            if client:
                 with st.chat_message("assistant"):
                     with st.spinner("Analizando..."):
+                        SYSTEM_INSTRUCTION_CHATBOT = (
+                            "Eres un Consultor Experto en Emprendimiento e Inteligencia Territorial en Medellín. "
+                            "Ayudas a validar y mejorar ideas de negocio usando datos de transporte (Metro), turismo y competencia local."
+                        )
                         full_prompt = f"Contexto Comuna {st.session_state.comuna_id}. Pregunta: {prompt}" if st.session_state.comuna_id else prompt
-                        resp = st.session_state.chat_session.send_message(full_prompt)
-                        st.markdown(resp.text)
-                        st.session_state.messages.append({"role": "assistant", "content": resp.text})
+                        
+                        messages = [{"role": "system", "content": SYSTEM_INSTRUCTION_CHATBOT}]
+                        for m in st.session_state.messages[:-1]:
+                            messages.append({"role": m["role"], "content": m["content"]})
+                        messages.append({"role": "user", "content": full_prompt})
+                        
+                        # Intentar usar el modelo principal con fallback manual para el chat
+                        res_text = "Error: No se pudo obtener respuesta."
+                        for m_id in MODELS:
+                            try:
+                                resp = client.chat.completions.create(
+                                    model=m_id,
+                                    messages=messages
+                                )
+                                res_text = resp.choices[0].message.content
+                                break
+                            except Exception as e:
+                                if "429" in str(e): continue
+                                res_text = f"Error: {e}"
+                                break
+                        st.markdown(res_text)
+                        st.session_state.messages.append({"role": "assistant", "content": res_text})
 
 if __name__ == "__main__": main()
