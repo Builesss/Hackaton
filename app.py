@@ -490,6 +490,52 @@ def get_comuna_stats(df_comuna):
         "df": df_viz
     }
 
+# --- MOTOR DE INTELIGENCIA (Enriquecimiento de Contexto) ---
+def prepare_market_snapshot(comuna_id, cnombres, poi_df, metro_data, attraction_data):
+    """
+    Genera un resumen estructurado para el LLM con el máximo potencial de datos.
+    """
+    # 1. Mix Económico
+    stats = get_comuna_stats(poi_df)
+    mix_text = ""
+    if not stats['chart_data'].empty:
+        total = stats['total']
+        mix_text = "\n".join([f"- {r['Sector']}: {r['Cantidad']} ({round(r['Cantidad']/total*100, 1)}%)" for _, r in stats['chart_data'].iterrows()])
+    
+    # 2. ADN Comercial (Muestra de nombres para inferir 'vibe')
+    vibe_sample = []
+    if not poi_df.empty:
+        vibe_sample = poi_df['nombre'].sample(min(len(poi_df), 15)).tolist()
+    
+    # 3. Infraestructura
+    metro_list = []
+    if metro_data:
+        m_filtered = filter_geojson_by_comuna(metro_data['features'], comuna_id)
+        metro_list = [f"{f['properties'].get('label')} (Línea {f['properties'].get('linea')})" for f in m_filtered]
+    
+    # 4. Turismo
+    att_list = []
+    if attraction_data:
+        a_filtered = filter_geojson_by_comuna(attraction_data['features'], comuna_id)
+        att_list = [f"{f['properties'].get('nombre_sitio')} ({f['properties'].get('tipo_atractivo')})" for f in a_filtered]
+
+    snapshot = {
+        "ubicacion": {
+            "comuna_id": comuna_id,
+            "nombre": cnombres.get(comuna_id, "Desconocida")
+        },
+        "indicadores_mercado": {
+            "total_establecimientos": stats['total'],
+            "mix_economico_distribucion": mix_text,
+            "muestra_adn_comercial": vibe_sample
+        },
+        "infraestructura_y_turismo": {
+            "estaciones_metro_cercanas": metro_list,
+            "atractivos_turisticos": att_list
+        }
+    }
+    return snapshot
+
 # --- UI PRINCIPAL ---
 def main():
     # Cargar datos base (ANTES del hero para usar stats)
@@ -777,13 +823,20 @@ def main():
                     context = get_comuna_context(st.session_state.comuna_id, "Desconocida", extra_context=extra)
                     try:
                         with st.spinner("Analizando micro-entorno con IA..."):
+                            snapshot = prepare_market_snapshot(st.session_state.comuna_id, cnombres, poi_comuna, metro_data, attraction_data)
+                            
                             SYSTEM_INSTRUCTION_RADAR = (
-                                "Eres un Analista Senior de Desarrollo Económico y Turismo en Medellín. "
-                                "Tu objetivo es identificar 'Huecos de Mercado' y oportunidades de negocio competitivas. "
-                                "Analiza la cercanía a estaciones de Metro, atractivos turísticos, puntos de información y el mix de comercios. "
-                                "Sugiere 3 ideas de negocio disruptivas. Sé muy profesional y usa datos para justificar."
+                                "Eres un Analista Senior de Desarrollo Económico y Estrategia Territorial en Medellín. "
+                                "Tu objetivo es detectar 'Oportunidades de Oro' y 'Nichos Desatendidos' basándote en datos duros. \n\n"
+                                "REGLAS DE ANÁLISIS:\n"
+                                "1. Analiza el 'Mix Económico': Si un sector domina >50%, advierte sobre saturación. Si un sector es <5%, evalúa si es una oportunidad.\n"
+                                "2. Cruza con Infraestructura: La cercanía al Metro aumenta el valor de negocios de conveniencia y servicios rápidos.\n"
+                                "3. Vibe Check: Usa la 'Muestra ADN' (nombres de negocios) para entender si la zona es popular, industrial o premium.\n\n"
+                                "ENTREGA: 3 Ideas de negocio altamente específicas para esta comuna. Justifica cada una con un dato del contexto enviado."
                             )
-                            res = generate_ai_content(f"Contexto Territorial Extendido: {json.dumps(context)}", SYSTEM_INSTRUCTION_RADAR)
+                            
+                            user_prompt = f"<SNAPSHOT_TERRITORIAL>\n{json.dumps(snapshot, indent=2)}\n</SNAPSHOT_TERRITORIAL>\n\nGenera el análisis estratégico."
+                            res = generate_ai_content(user_prompt, SYSTEM_INSTRUCTION_RADAR)
                             st.session_state.radar_insight = res
                     except Exception as e:
                         st.warning("🏮 El motor analítico está saturado. Por favor, reintenta en unos segundos.")
@@ -959,16 +1012,23 @@ def main():
                         
                         try:
                             with st.spinner("Consultando algoritmos de inteligencia territorial..."):
+                                snapshot_sim = prepare_market_snapshot(sim_comuna, cnombres, p_sim, metro_data, attraction_data)
+                                
                                 SYSTEM_INSTRUCTION_SIMULATOR = (
-                                    "Eres el 'Algoritmo de Viabilidad DataMede'. Tu función es evaluar ideas de negocio en Medellín. "
-                                    "Recibirás contexto de transporte, turismo y competencia. Debes dar un Score de Éxito del 0 al 100%. "
-                                    "Sé crítico pero constructivo. Estructura tu respuesta así: "
-                                    "1. 📈 SCORE DE ÉXITO: [X]% \n"
-                                    "2. 🧩 ANÁLISIS DE ENTORNO: (Relación con Metro/Turismo/Competencia) \n"
-                                    "3. ⚠️ RIESGOS DETECTADOS \n"
-                                    "4. 💡 RECOMENDACIÓN DE IMPACTO."
+                                    "Eres el 'Motor de Viabilidad Predictiva DataMede v2.0'. Tu función es evaluar proyectos empresariales en Medellín con rigor científico. \n\n"
+                                    "METODOLOGÍA:\n"
+                                    "1. Competencia: Compara la idea con el 'Mix Económico' y la 'Muestra ADN'. ¿Hay demasiados negocios similares?\n"
+                                    "2. Sinergia: ¿La idea aprovecha las estaciones de Metro o Atractivos Turísticos mencionados?\n"
+                                    "3. Riesgo: Identifica barreras de entrada específicas de la zona.\n\n"
+                                    "ESTRUCTURA DE RESPUESTA (Obligatoria):\n"
+                                    "1. 📈 SCORE DE ÉXITO: [X]% (Sé honesto, no des 100% a todo)\n"
+                                    "2. 🧩 ANÁLISIS DE ENTORNO: Justifica basándote en la infraestructura y comercios actuales.\n"
+                                    "3. ⚠️ RIESGOS: Menciona al menos 2 riesgos reales.\n"
+                                    "4. 💡 PIVOTE ESTRATÉGICO: Sugiere un ajuste a la idea para que sea más exitosa."
                                 )
-                                sim_resp = generate_ai_content(f"NEGOCIO: {idea} | CONTEXTO: {json.dumps(ctx_sim)}", SYSTEM_INSTRUCTION_SIMULATOR)
+                                
+                                sim_prompt = f"IDEA A EVALUAR: {idea}\n\n<SNAPSHOT_LOCAL>\n{json.dumps(snapshot_sim, indent=2)}\n</SNAPSHOT_LOCAL>"
+                                sim_resp = generate_ai_content(sim_prompt, SYSTEM_INSTRUCTION_SIMULATOR)
                                 st.session_state.last_sim = sim_resp
                         except Exception as e:
                             st.warning("⚠️ Error de cuota: El simulador está saturado. Reintenta en breve.")
@@ -1030,16 +1090,22 @@ def main():
             if client:
                 with st.chat_message("assistant"):
                     with st.spinner("Analizando..."):
+                        snapshot_chat = prepare_market_snapshot(st.session_state.comuna_id, cnombres, poi_comuna, metro_data, attraction_data)
+                        
                         SYSTEM_INSTRUCTION_CHATBOT = (
-                            "Eres un Consultor Experto en Emprendimiento e Inteligencia Territorial en Medellín. "
-                            "Ayudas a validar y mejorar ideas de negocio usando datos de transporte (Metro), turismo y competencia local."
+                            "Eres el 'Consultor Senior DataMede', experto en Geointeligencia y Economía de Medellín. \n\n"
+                            "TU CONOCIMIENTO ACTUAL:\n"
+                            f"{json.dumps(snapshot_chat, indent=2)}\n\n"
+                            "REGLAS:\n"
+                            "- Responde siempre basándote en los datos del SNAPSHOT arriba si la pregunta es sobre la comuna actual.\n"
+                            "- Sé ejecutivo, profesional y proactivo.\n"
+                            "- Si te preguntan algo que no está en el snapshot, usa tu conocimiento general de Medellín pero aclara que es una estimación."
                         )
-                        full_prompt = f"Contexto Comuna {st.session_state.comuna_id}. Pregunta: {prompt}" if st.session_state.comuna_id else prompt
                         
                         messages = [{"role": "system", "content": SYSTEM_INSTRUCTION_CHATBOT}]
                         for m in st.session_state.messages[:-1]:
                             messages.append({"role": m["role"], "content": m["content"]})
-                        messages.append({"role": "user", "content": full_prompt})
+                        messages.append({"role": "user", "content": prompt})
                         
                         res_text = "Error: No se pudo obtener respuesta."
                         for m_id in MODELS:
