@@ -18,98 +18,294 @@ st.markdown("""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&display=swap');
     
-    html, body, [data-testid="stAppViewContainer"] {
+    html, body, [data-testid="stAppViewContainer"], [data-testid="stSidebar"] {
         font-family: 'Outfit', sans-serif;
-        background-color: #030712;
-        color: #E2E8F0;
+        background-color: #FDFCF8 !important;
+        color: #1B3B5A !important;
     }
     
-    /* Fondo con gradiente profundo */
+    /* Forzar fondo claro en el Sidebar */
+    [data-testid="stSidebar"] {
+        background-color: #F3F4F6 !important;
+        border-right: 1px solid #D1D5DB;
+    }
+    
+    /* Fondo con gradiente sutil */
     .stApp {
-        background: radial-gradient(circle at top right, #0d1e3a, #030712 80%);
+        background: radial-gradient(circle at top right, #F3F4F6, #FDFCF8 80%);
     }
 
-    /* Glassmorphism Cards */
+    /* Premium Light Cards */
     .metric-card {
-        background: rgba(255, 255, 255, 0.03) !important;
-        backdrop-filter: blur(12px);
-        border: 1px solid rgba(255, 255, 255, 0.1);
+        background: #FFFFFF !important;
+        border: 1px solid #E5E7EB;
         padding: 1.5rem;
         border-radius: 20px;
-        box-shadow: 0 10px 40px rgba(0, 0, 0, 0.4);
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
         margin-bottom: 1.2rem;
         transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
     }
+    .metric-card-insights {
+        background: #F0F9FF !important; /* Color azul suave informativo */
+        width: 280px;
+        margin-left: 20px;
+        border: 1px solid #BAE6FD !important;
+        padding: 1rem;
+        border-radius: 24px;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.04);
+        margin-bottom: 1.2rem;
+        margin-top: 4rem;
+        text-align: center; /* Centrar contenido como solicitó el usuario */
+        transition: all 0.4s ease;
+    }
+    .metric-card-insights:hover {
+        background: #E0F2FE !important;
+        transform: translateY(-2px);
+    }
     .metric-card:hover {
-        transform: translateY(-8px);
-        border: 1px solid rgba(1, 255, 132, 0.5);
-        background: rgba(255, 255, 255, 0.05) !important;
+        transform: translateY(-5px);
+        border: 1px solid #1B3B5A;
+        box-shadow: 0 10px 30px rgba(27, 59, 90, 0.1);
     }
     
-    h1, h2, h3 {
+    /* Forzar color en TODO el texto base */
+    span, p, div, label, h1, h2, h3, h4, h5, h6 {
+        color: #1B3B5A !important;
+    }
+    
+    /* Ajustes específicos para st.metric */
+    [data-testid="stMetricValue"] div {
+        color: #1B3B5A !important;
         font-weight: 800 !important;
-        letter-spacing: -1.5px !important;
-        color: #F8FAFC !important;
-        text-shadow: 0 0 20px rgba(1, 255, 132, 0.2);
     }
+    [data-testid="stMetricLabel"] div {
+        color: #1B3B5A !important; /* Más oscuro para legibilidad */
+        font-weight: 700 !important;
+        opacity: 1 !important;
+    }
+    [data-testid="stMetricDelta"] {
+        color: #4B6741 !important; /* Verde corporativo */
+    }
+
+    h1 { font-weight: 800 !important; letter-spacing: -1.5px !important; }
     
-    /* Pestañas (Tabs) Estilizadas */
+    /* Pestañas (Tabs) Estilizadas - Máximo Contraste */
     .stTabs [data-baseweb="tab-list"] {
         gap: 12px;
-        background: rgba(255, 255, 255, 0.02);
-        padding: 10px;
+        background: #E5E7EB; /* Un poco más oscuro para separar del fondo */
+        padding: 8px;
         border-radius: 16px;
     }
     .stTabs [data-baseweb="tab"] {
-        background: rgba(255, 255, 255, 0.03) !important;
+        background: transparent !important;
         border-radius: 12px !important;
-        color: #94A3B8 !important;
+        color: #4B5563 !important; /* Gris oscuro para pestañas inactivas */
         padding: 10px 25px !important;
         border: 1px solid transparent !important;
         transition: 0.3s;
+        font-weight: 600 !important;
     }
     .stTabs [aria-selected="true"] {
-        background: rgba(1, 255, 132, 0.1) !important;
-        color: #01FF84 !important;
-        border: 1px solid rgba(1, 255, 132, 0.3) !important;
-        box-shadow: 0 0 15px rgba(1, 255, 132, 0.1);
+        background: #1B3B5A !important; /* Fondo Navy para la activa */
+        color: #FFFFFF !important; /* Texto blanco para la activa */
+        box-shadow: 0 4px 12px rgba(27, 59, 90, 0.2);
+    }
+    .stTabs [aria-selected="true"] p, .stTabs [aria-selected="true"] span {
+        color: #FFFFFF !important; /* Forzar blanco en activa */
     }
 
-    /* Botones Neón */
+    /* Botones Corporativos (Navy & Green) */
     .stButton>button {
-        background: linear-gradient(90deg, #008751 0%, #01FF84 100%) !important;
-        color: white !important;
+        background: linear-gradient(90deg, #1B3B5A 0%, #4B6741 100%) !important;
         border: none !important;
-        padding: 1rem 2rem !important;
+        padding: 0.8rem 2rem !important;
         border-radius: 14px !important;
         font-weight: 700 !important;
         font-size: 1rem !important;
-        box-shadow: 0 8px 25px rgba(1, 255, 132, 0.2) !important;
+        box-shadow: 0 8px 20px rgba(27, 59, 90, 0.2) !important;
         transition: all 0.4s !important;
         text-transform: uppercase;
         letter-spacing: 1px;
     }
+    .stButton>button p {
+        color: #FFFFFF !important;
+    }
     .stButton>button:hover {
-        box-shadow: 0 12px 35px rgba(1, 255, 132, 0.4) !important;
-        transform: translateY(-3px) scale(1.01);
+        box-shadow: 0 12px 30px rgba(27, 59, 90, 0.4) !important;
+        transform: translateY(-2px);
     }
 
-    /* Scrollbars Custom */
-    ::-webkit-scrollbar { width: 8px; }
-    ::-webkit-scrollbar-track { background: transparent; }
-    ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 10px; }
-    ::-webkit-scrollbar-thumb:hover { background: rgba(1, 255, 132, 0.3); }
-
-    /* Fix para prevenir que se corten las letras */
-    * { line-height: 1.5; }
-    div[data-testid="stMarkdownContainer"] p {
-        overflow-wrap: break-word;
-        word-wrap: break-word;
-        hyphens: auto;
+    /* Inputs y Selectores - Mejor Contraste */
+    .stSelectbox div, .stMultiSelect div, .stTextInput div, .stTextArea div {
+        color: #1B3B5A !important;
     }
     
-    /* Contenedor de IA con borde neón */
-    .st-emotion-cache-12w0qpk { border-radius: 20px; } /* Streamlit internal class for containers */
+    /* Placeholders legibles */
+    ::placeholder {
+        color: #6B7280 !important;
+        opacity: 0.8 !important;
+    }
+    
+    /* Scrollbars Custom */
+    ::-webkit-scrollbar { width: 8px; }
+    ::-webkit-scrollbar-track { background: #F3F4F6; }
+    ::-webkit-scrollbar-thumb { background: #D1D5DB; border-radius: 10px; }
+    ::-webkit-scrollbar-thumb:hover { background: #1B3B5A; }
+
+    /* Fix para legibilidad general */
+    * { line-height: 1.5; }
+    
+    /* Contenedor de IA con borde profesional */
+    [data-testid="stVerticalBlockBorderWrapper"] {
+        background: #FFFFFF !important;
+        border-radius: 20px !important;
+        border: 2px solid #1B3B5A !important; /* Más grueso y oscuro */
+        box-shadow: 0 4px 20px rgba(27, 59, 90, 0.08) !important;
+    }
+
+    /* Forzar visibilidad en Sidebar Labels */
+    [data-testid="stSidebar"] label {
+        font-weight: 700 !important;
+        font-size: 1.1rem !important;
+        margin-bottom: 5px !important;
+    }
+
+    /* ===== HERO BANNER ===== */
+    .hero-banner {
+        background: linear-gradient(135deg, #1B3B5A 0%, #2D5F8A 50%, #4B6741 100%);
+        border-radius: 24px;
+        padding: 2.5rem 3rem;
+        margin-bottom: 1.5rem;
+        position: relative;
+        overflow: hidden;
+        margin-top: 3rem;
+    }
+    .hero-banner::before {
+        content: '';
+        position: absolute;
+        top: -50%;
+        right: -20%;
+        width: 400px;
+        height: 400px;
+        background: radial-gradient(circle, rgba(212,155,53,0.15) 0%, transparent 70%);
+        border-radius: 50%;
+    }
+    .hero-banner h1, .hero-banner p, .hero-banner span {
+        color: #FFFFFF !important;
+    }
+    .hero-banner .hero-sub {
+        color: rgba(255,255,255,0.8) !important;
+        font-size: 1.1rem;
+    }
+
+    /* ===== STAT TILES (Hero KPIs) ===== */
+    .stat-tile {
+        background: rgba(255,255,255,0.12);
+        backdrop-filter: blur(10px);
+        border: 1px solid rgba(255,255,255,0.2);
+        border-radius: 16px;
+        padding: 1.2rem 1.5rem;
+        text-align: center;
+    }
+    .stat-tile .stat-number {
+        font-size: 1.8rem !important;
+        font-weight: 800 !important;
+        color: #D49B35 !important;
+    }
+    .stat-tile .stat-label {
+        font-size: 0.85rem !important;
+        color: rgba(255,255,255,0.85) !important;
+        font-weight: 400 !important;
+    }
+
+    /* ===== KPI MINI CARDS ===== */
+    .kpi-card {
+        background: #FFFFFF;
+        border: 1px solid #E5E7EB;
+        border-radius: 16px;
+        padding: 1.2rem;
+        text-align: center;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.04);
+        transition: all 0.3s;
+    }
+    .kpi-card:hover { border-color: #D49B35; }
+    .kpi-card .kpi-icon { font-size: 1.8rem; margin-bottom: 0.3rem; }
+    .kpi-card .kpi-value {
+        font-size: 1.4rem !important;
+        font-weight: 800 !important;
+        color: #1B3B5A !important;
+    }
+    .kpi-card .kpi-label {
+        font-size: 0.8rem !important;
+        color: #6B7280 !important;
+        font-weight: 500 !important;
+    }
+
+    /* ===== SUGGESTION CHIPS ===== */
+    .suggestion-chip {
+        display: inline-block;
+        background: #F3F4F6;
+        border: 1px solid #E5E7EB;
+        border-radius: 24px;
+        padding: 0.5rem 1.2rem;
+        margin: 0.3rem;
+        margin-bottom: 1.2rem; /* Más espacio inferior */
+        font-size: 0.85rem;
+        color: #1B3B5A !important;
+        cursor: pointer;
+        transition: 0.2s;
+    }
+    .suggestion-chip:hover { background: #1B3B5A; color: #FFFFFF !important; border-color: #1B3B5A; }
+
+    /* ===== SECTION HEADERS ===== */
+    .section-header {
+        display: flex;
+        align-items: center;
+        gap: 0.8rem;
+        margin-bottom: 1rem;
+        padding-bottom: 0.5rem;
+        border-bottom: 2px solid #E5E7EB;
+    }
+    .section-header .section-icon {
+        font-size: 1.5rem;
+        background: linear-gradient(135deg, #1B3B5A, #4B6741);
+        -webkit-background-clip: text;
+        background-clip: text;
+    }
+
+    /* ===== SIDEBAR INFO CARD ===== */
+    .sidebar-info {
+        background: #FFFFFF;
+        border: 1px solid #E5E7EB;
+        border-radius: 12px;
+        padding: 1rem;
+        margin-top: 1rem;
+        font-size: 0.85rem;
+    }
+
+    /* ===== FOOTER HACK ===== */
+    footer {visibility: hidden;}
+    
+    /* Espaciado de seguridad para que el contenido no pegue al footer */
+    .block-container {
+        padding-top: 2rem !important;
+        padding-bottom: 5rem !important;
+        min-height: 100vh;
+    }
+
+    /* ===== FOOTER (Professional) ===== */
+    .app-footer {
+        width: 100%;
+        text-align: center;
+        padding: 3rem 1rem;
+        margin-top: 6rem; /* Mayor despegue */
+        border-top: 1px solid #E5E7EB;
+        background: #FDFCF8;
+        color: #9CA3AF !important;
+        font-size: 0.85rem;
+    }
+    .app-footer span, .app-footer p { color: #9CA3AF !important; }
+
 </style>
 """, unsafe_allow_html=True)
 
@@ -175,13 +371,13 @@ if "last_sim" not in st.session_state: st.session_state.last_sim = None
 # --- CARGAS DE DATOS (REPROYECTADOS WGS84) ---
 @st.cache_data
 def load_comunas():
-    path = "data/wgs84_limite_catastral_de_comun.geojson"
+    path = "data/wgs84_limite_catastral_de_comun_simple.geojson"
     if not os.path.exists(path): return None
     with open(path, "r", encoding="utf-8") as f: return json.load(f)
 
 @st.cache_data
 def load_barrios():
-    path = "data/wgs84_limite_barrio_vereda_cata.geojson"
+    path = "data/wgs84_limite_barrio_vereda_cata_simple.geojson"
     if not os.path.exists(path): return None
     with open(path, "r", encoding="utf-8") as f: return json.load(f)
 
@@ -195,7 +391,7 @@ def load_poi_database():
 # Cargar GeoJSON de Metro (Local Reproyectado)
 @st.cache_data
 def load_metro_geojson():
-    path = "data/wgs84_Estaciones_Sistema_Metro.geojson"
+    path = "data/wgs84_Estaciones_Sistema_Metro_reconciled.geojson"
     if not os.path.exists(path): return None
     with open(path, "r", encoding="utf-8") as f: return json.load(f)
 
@@ -271,9 +467,15 @@ def get_comuna_stats(df_comuna):
     
     # Aplicar mapeo a la columna de sector para visualización
     df_viz = df_comuna.copy()
-    df_viz['sector_nombre'] = df_viz['sector'].map(lambda x: SECTOR_MAP.get(str(x), f"Sector {x}"))
+    # Filtrar registros sin sector válido antes de mapear
+    df_viz = df_viz[df_viz['sector'].notna()]
+    df_viz = df_viz[df_viz['sector'].astype(str).str.strip().ne('')]
+    df_viz = df_viz[df_viz['sector'].astype(str).str.lower() != 'none']
+    df_viz['sector_nombre'] = df_viz['sector'].map(lambda x: SECTOR_MAP.get(str(x).strip(), f"Sector {x}"))
+    # Remover cualquier sector_nombre que sea genérico vacío
+    df_viz = df_viz[~df_viz['sector_nombre'].isin(['Sector ', 'Sector None', 'Sector nan'])]
     
-    total = len(df_viz)
+    total = len(df_comuna)  # Total original incluyendo sin sector
     top_cat = df_viz['sector_nombre'].mode().iloc[0] if not df_viz.empty else "N/A"
     
     # Preparar DataFrame para gráficos
@@ -290,16 +492,7 @@ def get_comuna_stats(df_comuna):
 
 # --- UI PRINCIPAL ---
 def main():
-    col_logo, col_title = st.columns([1, 10])
-    with col_logo:
-        # Usar un logo genérico o el emoji si el archivo no existe
-        st.markdown("## 🌍")
-    with col_title:
-        st.markdown("<h1 style='margin-bottom:0;'>GeoMed Intelligence</h1>", unsafe_allow_html=True)
-        st.markdown("<p style='color:#94A3B8; margin-top:0;'>Geointeligencia y Analítica para el Ecosistema de Medellín</p>", unsafe_allow_html=True)
-    st.divider()
-
-    # Cargar datos base
+    # Cargar datos base (ANTES del hero para usar stats)
     geojson_comunas = load_comunas()
     all_pois_df = load_poi_database()
     all_barrios = load_barrios()
@@ -307,8 +500,40 @@ def main():
     attraction_data = load_attractions()
     tur_info_data = load_tur_info()
 
+    # Calcular estadísticas globales para el hero
+    total_pois = len(all_pois_df) if isinstance(all_pois_df, pd.DataFrame) else 0
+    total_comunas = len(geojson_comunas['features']) if geojson_comunas else 0
+    total_metro = len(metro_data['features']) if metro_data else 0
+    total_atractivos = len(attraction_data['features']) if attraction_data else 0
+
+    # ===== HERO BANNER =====
+    st.markdown(f"""
+    <div class='hero-banner'>
+        <h1 style='font-size:2.8rem; margin-bottom:0.3rem;'>🌍 GeoMed Intelligence</h1>
+        <p class='hero-sub'>Plataforma de Geointeligencia y Analítica Territorial para el Ecosistema Empresarial de Medellín</p>
+        <div style='display:flex; gap:1rem; margin-top:1.5rem; flex-wrap:wrap;'>
+            <div class='stat-tile'>
+                <div class='stat-number'>{total_pois:,}</div>
+                <div class='stat-label'>Establecimientos Indexados</div>
+            </div>
+            <div class='stat-tile'>
+                <div class='stat-number'>{total_comunas}</div>
+                <div class='stat-label'>Comunas Mapeadas</div>
+            </div>
+            <div class='stat-tile'>
+                <div class='stat-number'>{total_metro}</div>
+                <div class='stat-label'>Estaciones de Metro</div>
+            </div>
+            <div class='stat-tile'>
+                <div class='stat-number'>{total_atractivos}</div>
+                <div class='stat-label'>Atractivos Turísticos</div>
+            </div>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+
     # Sidebar / Panel de Control
-    if 'comuna_id' not in st.session_state: st.session_state.comuna_id = "10" # La Candelaria por defecto
+    if 'comuna_id' not in st.session_state: st.session_state.comuna_id = "10"
     
     comunas_lista = []
     cnombres = {}
@@ -332,7 +557,30 @@ def main():
         
         if st.button("🧹 Limpiar Filtros", use_container_width=True):
             st.session_state.comuna_id = "10"
-            st.rerun()
+            st.rerun()     
+
+        st.divider()
+
+        # Fuentes de Datos
+        st.markdown("### 📁 Fuentes de Datos")
+        st.markdown("""
+        <div class='sidebar-info'>
+            <b>🏛️ Alcaldía de Medellín</b><br>
+            Datos abiertos georreferenciados<br><br>
+            <b>🚇 Metro de Medellín</b><br>
+            Estaciones y líneas<br><br>
+            <b>🤖 IA Generativa</b><br>
+            OpenRouter (LLMs gratuitos)
+        </div>
+        """, unsafe_allow_html=True)
+
+        st.divider()
+        st.markdown("""
+        <div style='text-align:center; opacity:0.6; font-size:0.8rem;'>
+            <p>GeoMed Intelligence v2.0</p>
+            <p>Hackathon Edition 🚀</p>
+        </div>
+        """, unsafe_allow_html=True)
 
     # Filtrar datos de la comuna seleccionada (ULTRA RÁPIDO con Pandas)
     poi_comuna = filter_df_by_comuna(all_pois_df, st.session_state.comuna_id)
@@ -355,12 +603,12 @@ def main():
     # --------------------------
     with tab1:
         # 1. Mapa Base (Ancho completo)
-        # Crear mapa base con Estilo Dark (Esri World Dark Gray) para máxima compatibilidad
+        # Crear mapa base con Estilo Claro (Esri World Light Gray)
         m = folium.Map(location=[6.2442, -75.5812], zoom_start=12, tiles=None, max_zoom=20)
         folium.TileLayer(
-            tiles="https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}",
+            tiles="https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}",
             attr="Esri",
-            name="🌃 Medellín Tech (Oscuro)",
+            name="⚪ Medellín Analítico (Claro)",
             max_zoom=20,
             max_native_zoom=16,
             overlay=False,
@@ -393,7 +641,7 @@ def main():
                 cluster = MarkerCluster().add_to(fg_pois)
                 df_map = poi_comuna.head(500)
                 for _, row in df_map.iterrows():
-                    folium.CircleMarker(location=[row['lat'], row['lon']], radius=3, color="#01FF84", fill=True, tooltip=f"<b>{row['nombre']}</b>").add_to(cluster)
+                    folium.CircleMarker(location=[row['lat'], row['lon']], radius=3, color="#1B3B5A", fill=True, tooltip=f"<b>{row['nombre']}</b>").add_to(cluster)
                 fg_pois.add_to(m)
                 
                 heat_data = poi_comuna[['lat', 'lon']].values.tolist()
@@ -442,27 +690,85 @@ def main():
                 st.session_state.comuna_id = new_cid
                 st.rerun()
 
-        # 2. Panel Inferior (Insights y Controles)
+        # 2. KPI Row (Mini-cards below map)
         st.divider()
-        col_info, col_ai = st.columns([1, 2])
+        metro_cercano = filter_geojson_by_comuna(metro_data['features'], st.session_state.comuna_id) if metro_data else []
+        atr_cercanos = filter_geojson_by_comuna(attraction_data['features'], st.session_state.comuna_id) if attraction_data else []
+        barrios_count = len(filter_geojson_by_comuna(all_barrios['features'], st.session_state.comuna_id)) if all_barrios else 0
+        
+        kc1, kc2, kc3, kc4, kc5 = st.columns(5)
+        with kc1:
+            st.markdown(f"""<div class='kpi-card'>
+                <div class='kpi-icon'>🏪</div>
+                <div class='kpi-value'>{len(poi_comuna):,}</div>
+                <div class='kpi-label'>Comercios</div>
+            </div>""", unsafe_allow_html=True)
+        with kc2:
+            st.markdown(f"""<div class='kpi-card'>
+                <div class='kpi-icon'>🏘️</div>
+                <div class='kpi-value'>{barrios_count}</div>
+                <div class='kpi-label'>Barrios</div>
+            </div>""", unsafe_allow_html=True)
+        with kc3:
+            st.markdown(f"""<div class='kpi-card'>
+                <div class='kpi-icon'>🚇</div>
+                <div class='kpi-value'>{len(metro_cercano)}</div>
+                <div class='kpi-label'>Est. Metro</div>
+            </div>""", unsafe_allow_html=True)
+        with kc4:
+            st.markdown(f"""<div class='kpi-card'>
+                <div class='kpi-icon'>⭐</div>
+                <div class='kpi-value'>{len(atr_cercanos)}</div>
+                <div class='kpi-label'>Atractivos</div>
+            </div>""", unsafe_allow_html=True)
+        with kc5:
+            n_sectors = len(get_macro_sectores(poi_comuna))
+            st.markdown(f"""<div class='kpi-card'>
+                <div class='kpi-icon'>📊</div>
+                <div class='kpi-value'>{n_sectors}</div>
+                <div class='kpi-label'>Sectores</div>
+            </div>""", unsafe_allow_html=True)
+
+        # 3. Panel Inferior (3 columnas: Contexto, Infraestructura, IA)
+        st.markdown("")
+        col_info, col_infra, col_ai = st.columns([1, 1, 2])
         
         with col_info:
-            st.markdown("### 🗺️ Entorno Local")
+            st.markdown("### 📍 Entorno Local")
             if st.session_state.comuna_id:
-                st.markdown(f"<div class='metric-card'>📍 <b>Comuna {st.session_state.comuna_id}</b><br>{cnombres.get(st.session_state.comuna_id, '')}</div>", unsafe_allow_html=True)
-                st.metric("Puntos Comerciales", f"{len(poi_comuna):,}")
-                st.info("💡 Usa el mapa para explorar la densidad comercial y nodos de transporte.")
-
+                st.markdown(f"""<div class='metric-card'>
+                    <b style='font-size:1.2rem;'>Comuna {st.session_state.comuna_id}</b><br>
+                    <span style='color:#6B7280 !important;'>{cnombres.get(st.session_state.comuna_id, '')}</span><br><br>
+                    <span style='font-size:0.85rem; color:#4B6741 !important;'>Sector dominante:</span><br>
+                    <b>{stats['top_cat'][:25] if stats['top_cat'] != 'N/A' else 'Sin datos'}</b>
+                </div>""", unsafe_allow_html=True)
+                st.info("💡 Haz clic en una comuna del mapa para cambiar el contexto.")
+        
+        with col_infra:
+            st.markdown("""
+            <div class='metric-card-insights'>
+                <p style='font-size:0.95rem; font-weight:600; margin-bottom:0.5rem;'>¿Qué hace este motor?</p>
+                <p style='font-size:0.85rem; line-height:1.4; color:#4B5563;'>
+                    Cruza variables críticas en tiempo real:
+                </p>
+                <ul style='font-size:0.8rem; list-style-type: none; color:#6B7280; padding-right:1rem;'>
+                    <li>📍 Proximidad a estaciones de <b>Metro</b>.</li>
+                    <li>🎭 Puntos de <b>interés turístico</b></li>
+                    <li>🏪 Densidad de <b>comercios actuales</b>.</li>
+                </ul>
+                <p style='font-size:0.8rem; font-style:italic; border-top:1px solid #F3F4F6; padding-top:0.5rem; margin-top:0.5rem;'>
+                    Identifica "huecos de mercado" para sugerir modelos de negocio con alta probabilidad de éxito.
+                </p>
+            </div>
+            """, unsafe_allow_html=True)
         with col_ai:
             if st.session_state.comuna_id:
-                st.markdown("### 🌟 Inteligencia Territorial")
+                st.markdown("### 🤖 Inteligencia Territorial")
                 if st.button("🚀 Generar Insights Estratégicos", use_container_width=True):
-                    metro_cercano = filter_geojson_by_comuna(metro_data['features'], st.session_state.comuna_id) if metro_data else []
-                    atr_cercanos = filter_geojson_by_comuna(attraction_data['features'], st.session_state.comuna_id) if attraction_data else []
                     inf_cercanos = filter_geojson_by_comuna(tur_info_data['features'], st.session_state.comuna_id) if tur_info_data else []
                     
                     extra = {
-                        "metro": [m['properties'].get('label') for m in metro_cercano],
+                        "metro": [m_item['properties'].get('label') for m_item in metro_cercano],
                         "atractivos_turisticos": [a['properties'].get('nombre_sitio') for a in atr_cercanos],
                         "puntos_info": [i['properties'].get('sitio') for i in inf_cercanos],
                         "conteo_comercios_actuales": len(poi_comuna) if not poi_comuna.empty else 0
@@ -483,8 +789,14 @@ def main():
                         st.warning("🏮 El motor analítico está saturado. Por favor, reintenta en unos segundos.")
                 
                 if st.session_state.radar_insight:
-                    with st.container(height=350, border=True):
+                    with st.container(height=300, border=True):
                         st.markdown(st.session_state.radar_insight)
+                else:
+                    st.markdown("""<div class='metric-card' style='text-align:center; padding:2rem;'>
+                        <p style='font-size:2rem;'>🧠</p>
+                        <p><b>Motor de Análisis Territorial</b></p>
+                        <p style='color:#6B7280 !important; font-size:0.9rem;'>Presiona el botón para generar insights estratégicos basados en IA sobre esta comuna.</p>
+                    </div>""", unsafe_allow_html=True)
 
     # --------------------------
     # TAB 2: ANALYTICS BI
@@ -493,16 +805,41 @@ def main():
         if not st.session_state.comuna_id:
             st.warning("Seleccione una comuna en el Radar para ver las estadísticas.")
         elif stats:
-            st.subheader(f"Dashboard de Inteligencia Comuna {st.session_state.comuna_id}")
-            st.markdown(f"Análisis detallado de **{cnombres.get(st.session_state.comuna_id, '')}**")
+            st.markdown(f"### 📊 Dashboard de Inteligencia — Comuna {st.session_state.comuna_id} · {cnombres.get(st.session_state.comuna_id, '')}")
             
-            k1, k2, k3 = st.columns(3)
-            with k1: st.metric("Establecimientos", f"{stats['total']:,}")
-            with k2: st.metric("Sector Dominante", stats['top_cat'][:20] + "...")
-            with k3: st.metric("Índice de Oportunidad", "Estratégico 📈")
+            # 4 KPI Cards
+            k1, k2, k3, k4 = st.columns(4)
+            with k1:
+                st.markdown(f"""<div class='kpi-card'>
+                    <div class='kpi-icon'>🏪</div>
+                    <div class='kpi-value'>{stats['total']:,}</div>
+                    <div class='kpi-label'>Establecimientos</div>
+                </div>""", unsafe_allow_html=True)
+            with k2:
+                top_display = stats['top_cat'][:18] if stats['top_cat'] != 'N/A' else 'N/A'
+                st.markdown(f"""<div class='kpi-card'>
+                    <div class='kpi-icon'>🏆</div>
+                    <div class='kpi-value' style='font-size:1rem !important;'>{top_display}</div>
+                    <div class='kpi-label'>Sector Dominante</div>
+                </div>""", unsafe_allow_html=True)
+            with k3:
+                n_sect = len(stats['dist'])
+                st.markdown(f"""<div class='kpi-card'>
+                    <div class='kpi-icon'>📂</div>
+                    <div class='kpi-value'>{n_sect}</div>
+                    <div class='kpi-label'>Categorías Activas</div>
+                </div>""", unsafe_allow_html=True)
+            with k4:
+                density = round(stats['total'] / max(len(filter_geojson_by_comuna(all_barrios['features'], st.session_state.comuna_id)) if all_barrios else 1, 1))
+                st.markdown(f"""<div class='kpi-card'>
+                    <div class='kpi-icon'>📈</div>
+                    <div class='kpi-value'>{density:,}</div>
+                    <div class='kpi-label'>Densidad / Barrio</div>
+                </div>""", unsafe_allow_html=True)
             
             st.divider()
             
+            # Charts Row
             c_left, c_right = st.columns([2, 1])
             with c_left:
                 if not stats['chart_data'].empty and 'Cantidad' in stats['chart_data'].columns:
@@ -513,33 +850,99 @@ def main():
                         orientation='h', 
                         title="Concentración por Actividad Económica", 
                         color='Cantidad', 
-                        color_continuous_scale='GnBu'
+                        color_continuous_scale='Bluyl'
                     )
-                    fig.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', font_color='white', height=450)
+                    fig.update_layout(
+                        template='plotly_white',
+                        paper_bgcolor='rgba(0,0,0,0)', 
+                        plot_bgcolor='rgba(0,0,0,0)', 
+                        font=dict(color='#1B3B5A', size=12),
+                        height=400,
+                        margin=dict(l=20, r=20, t=40, b=20)
+                    )
                     st.plotly_chart(fig, use_container_width=True)
                 else:
                     st.info("No hay datos analíticos para los filtros seleccionados.")
             
             with c_right:
-                st.markdown("### Mix de Mercado Local")
+                st.markdown("#### 🍩 Mix de Mercado")
                 if not stats['chart_data'].empty:
-                    fig_pie = px.pie(stats['chart_data'].head(5), values='Cantidad', names='Sector', hole=0.4)
-                    fig_pie.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', font_color='white', showlegend=False)
+                    fig_pie = px.pie(stats['chart_data'].head(5), values='Cantidad', names='Sector', hole=0.4, color_discrete_sequence=['#1B3B5A', '#4B6741', '#D49B35', '#9CA3AF', '#E5E7EB'])
+                    fig_pie.update_layout(
+                        template='plotly_white',
+                        paper_bgcolor='rgba(0,0,0,0)', 
+                        plot_bgcolor='rgba(0,0,0,0)', 
+                        font=dict(color='#1B3B5A'), 
+                        showlegend=False,
+                        height=350,
+                        margin=dict(l=10, r=10, t=10, b=10)
+                    )
                     st.plotly_chart(fig_pie, use_container_width=True)
-                    st.info("💡 Este mix sugiere la saturación actual. Las zonas con menor porcentaje representan nichos desatendidos.")
+            
+            # Bottom Row: Data Table + Insights
+            st.divider()
+            bi_left, bi_right = st.columns([1, 1])
+            
+            with bi_left:
+                st.markdown("#### 📋 Distribución Detallada")
+                if not stats['chart_data'].empty:
+                    display_df = stats['chart_data'].copy()
+                    display_df['% del Total'] = (display_df['Cantidad'] / display_df['Cantidad'].sum() * 100).round(1)
+                    display_df['% del Total'] = display_df['% del Total'].astype(str) + '%'
+                    st.dataframe(display_df, use_container_width=True, hide_index=True)
+                else:
+                    st.caption("Sin datos para mostrar.")
+            
+            with bi_right:
+                st.markdown("#### 💡 Insights Automáticos")
+                if stats['total'] > 0 and not stats['chart_data'].empty:
+                    top_sector = stats['chart_data'].iloc[0]
+                    top_pct = round(top_sector['Cantidad'] / stats['total'] * 100, 1)
+                    st.success(f"🏆 **{top_sector['Sector']}** domina con el **{top_pct}%** del mercado local.")
+                    
+                    if len(stats['chart_data']) >= 2:
+                        bottom_sector = stats['chart_data'].iloc[-1]
+                        bottom_pct = round(bottom_sector['Cantidad'] / stats['total'] * 100, 1)
+                        st.warning(f"🔍 **{bottom_sector['Sector']}** representa solo el **{bottom_pct}%** — posible nicho desatendido.")
+                    
+                    st.info(f"📊 La comuna tiene **{len(stats['dist'])} sectores** económicos activos con **{stats['total']:,}** establecimientos registrados.")
+                else:
+                    st.caption("Selecciona una comuna con datos para ver insights.")
 
     # --------------------------
     # TAB 3: SIMULADOR DE ÉXITO (HACKATHON POWER-UP)
     # --------------------------
     with tab3:
-        st.subheader("🧪 Simulador de Viabilidad Predictiva")
-        st.markdown("Ingresa tu idea de negocio para recibir un análisis de riesgo y éxito basado en datos territoriales.")
+        st.markdown("### 🧪 Simulador de Viabilidad Predictiva")
+        st.markdown("Motor de predicción impulsado por IA que evalúa tu idea contra datos reales de competencia, transporte y flujo peatonal.")
         
+        # Context bar
+        ctx_c1, ctx_c2, ctx_c3 = st.columns(3)
+        with ctx_c1:
+            st.markdown(f"""<div class='kpi-card'>
+                <div class='kpi-icon'>📍</div>
+                <div class='kpi-value' style='font-size:1rem !important;'>{cnombres.get(st.session_state.comuna_id, 'N/A')}</div>
+                <div class='kpi-label'>Comuna Base</div>
+            </div>""", unsafe_allow_html=True)
+        with ctx_c2:
+            st.markdown(f"""<div class='kpi-card'>
+                <div class='kpi-icon'>🏪</div>
+                <div class='kpi-value'>{len(poi_comuna):,}</div>
+                <div class='kpi-label'>Competidores Potenciales</div>
+            </div>""", unsafe_allow_html=True)
+        with ctx_c3:
+            metro_ct = len(filter_geojson_by_comuna(metro_data['features'], st.session_state.comuna_id)) if metro_data else 0
+            st.markdown(f"""<div class='kpi-card'>
+                <div class='kpi-icon'>🚇</div>
+                <div class='kpi-value'>{metro_ct}</div>
+                <div class='kpi-label'>Nodos de Transporte</div>
+            </div>""", unsafe_allow_html=True)
+        
+        st.markdown("")
         c_sim1, c_sim2 = st.columns([1, 1])
         with c_sim1:
             with st.container(border=True):
                 idea = st.text_area("¿Cuál es tu propuesta de negocio?", placeholder="Ej: Venta de comida saludable cerca de la estación Estadio...", height=150)
-                # Usamos la comuna global por defecto pero permitimos cambiarla para simular
                 sim_comuna = st.selectbox("Comuna de Simulación:", opciones, format_func=lambda x: f"C{x} - {cnombres.get(x, '')}", key="sim_sel", index=idx)
                 
                 if st.button("🚀 Calcular Probabilidad de Éxito", use_container_width=True):
@@ -571,26 +974,54 @@ def main():
                             st.warning("⚠️ Error de cuota: El simulador está saturado. Reintenta en breve.")
                     else:
                         st.warning("Por favor, describe tu idea para realizar la simulación.")
+                
+                # Suggestion chips
+                st.markdown("**Ideas sugeridas para explorar:**")
+                chip_cols = st.columns(2)
+                suggestions = ["Cafetería gourmet", "Tienda de tecnología", "Restaurante vegano", "Coworking space"]
+                for i, sug in enumerate(suggestions):
+                    with chip_cols[i % 2]:
+                        st.markdown(f"<div class='suggestion-chip'>💡 {sug}</div>", unsafe_allow_html=True)
+                
+                st.write("") # Espaciador final para separar del borde inferior
 
         with c_sim2:
-            if "last_sim" in st.session_state:
-                st.markdown("<div class='metric-card'>", unsafe_allow_html=True)
+            if st.session_state.get("last_sim"):
                 st.markdown("### 📊 Resultado del Análisis")
-                st.markdown(st.session_state.last_sim)
-                st.markdown("</div>", unsafe_allow_html=True)
-                
-                # Botón de exportación simulado (Wow factor)
-                st.download_button("📩 Descargar Reporte de Viabilidad (PDF)", "Contenido del reporte...", file_name="DataMede_Reporte.pdf", disabled=True, help="Función disponible en versión Pro")
+                with st.container(border=True, height=450):
+                    st.markdown(st.session_state.last_sim)
+                st.download_button("📩 Descargar Reporte (PDF)", "Contenido del reporte...", file_name="DataMede_Reporte.pdf", disabled=True, help="Función disponible en versión Pro")
             else:
-                st.info("👈 Ingresa los detalles de tu emprendimiento para activar el motor de predicción.")
+                st.markdown("""<div class='metric-card' style='text-align:center; padding:3rem;'>
+                    <p style='font-size:3rem;'>🧪</p>
+                    <p><b>Motor de Predicción Territorial</b></p>
+                    <p style='color:#6B7280 !important; font-size:0.9rem;'>Ingresa los detalles de tu emprendimiento para activar el análisis de viabilidad con IA.</p>
+                    <hr style='margin:1rem 0; border-color: rgba(27,59,90,0.1);'>
+                    <p style='font-size:0.8rem; color:#9CA3AF !important;'>Powered by GeoMed Intelligence Engine</p>
+                </div>""", unsafe_allow_html=True)
 
     # --------------------------
     # TAB 4: CONSULTORÍA IA
     # --------------------------
     with tab4:
-        st.subheader("💡 Consultoría Estratégica en Tiempo Real")
+        st.markdown("<br>", unsafe_allow_html=True) 
+        st.markdown("### 💬 Consultoría Estratégica en Tiempo Real")
+        st.markdown(f"*Conversando sobre **{cnombres.get(st.session_state.comuna_id, 'Medellín')}** · {len(poi_comuna):,} establecimientos en contexto*")
+        
+        # Suggested questions
+        if not st.session_state.messages:
+            st.markdown("**Preguntas sugeridas para comenzar:**")
+            sq1, sq2 = st.columns(2)
+            with sq1:
+                st.markdown("<div class='suggestion-chip'>🏪 ¿Qué tipo de negocio falta en esta comuna?</div>", unsafe_allow_html=True)
+                st.markdown("<div class='suggestion-chip'>📊 ¿Cuál es la competencia en el sector gastronómico?</div>", unsafe_allow_html=True)
+            with sq2:
+                st.markdown("<div class='suggestion-chip'>🚇 ¿Cómo influye el Metro en los negocios?</div>", unsafe_allow_html=True)
+                st.markdown("<div class='suggestion-chip'>💰 ¿Cuánto capital necesito para emprender aquí?</div>", unsafe_allow_html=True)
         for msg in st.session_state.messages:
             with st.chat_message(msg["role"]): st.markdown(msg["content"])
+        
+        st.write("") # Espaciador al final del contenedor
         
         if prompt := st.chat_input("Pregúntale a DataMede sobre el mercado..."):
             st.session_state.messages.append({"role": "user", "content": prompt})
@@ -610,7 +1041,6 @@ def main():
                             messages.append({"role": m["role"], "content": m["content"]})
                         messages.append({"role": "user", "content": full_prompt})
                         
-                        # Intentar usar el modelo principal con fallback manual para el chat
                         res_text = "Error: No se pudo obtener respuesta."
                         for m_id in MODELS:
                             try:
@@ -626,5 +1056,14 @@ def main():
                                 break
                         st.markdown(res_text)
                         st.session_state.messages.append({"role": "assistant", "content": res_text})
+
+    # ===== FOOTER =====
+    st.markdown("""
+    <div class='app-footer'>
+        <p><b>GeoMed Intelligence</b> · Plataforma de Geointeligencia Territorial</p>
+        <p>Datos: Alcaldía de Medellín · Metro de Medellín · OpenRouter AI</p>
+        <p style='margin-top:0.5rem; font-size:0.75rem;'>Hackathon Edition 2026 🚀 · Desarrollado con ❤️ en Medellín, Colombia</p>
+    </div>
+    """, unsafe_allow_html=True)
 
 if __name__ == "__main__": main()
