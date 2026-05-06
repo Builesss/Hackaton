@@ -8,7 +8,12 @@ import json
 import os
 from dotenv import load_dotenv
 from openai import OpenAI
+from supabase import create_client, Client
 
+load_dotenv()
+SUPABASE_URL = os.getenv("NEXT_PUBLIC_SUPABASE_URL")
+SUPABASE_KEY = os.getenv("NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY")
+supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 # Configuración de Streamlit
 st.set_page_config(page_title="GeoMed - Inteligencia Territorial", layout="wide", page_icon="🌍")
 
@@ -177,7 +182,7 @@ st.markdown("""
         background: linear-gradient(135deg, #1B3B5A 0%, #2D5F8A 50%, #4B6741 100%);
         border-radius: 24px;
         padding: 2.5rem 3rem;
-        margin-bottom: 1.5rem;
+        margin-bottom: 3rem;
         position: relative;
         overflow: hidden;
         margin-top: 3rem;
@@ -352,8 +357,6 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# Cargar variables de entorno (Resiliencia Local + Cloud)
-load_dotenv()
 api_key = os.getenv("OPENROUTER_API_KEY")
 
 # Si no hay clave local, intentar buscar en los secretos de Streamlit (Cloud)
@@ -410,6 +413,58 @@ def generate_ai_content(prompt, system_instruction):
 if "messages" not in st.session_state: st.session_state.messages = []
 if "radar_insight" not in st.session_state: st.session_state.radar_insight = None
 if "last_sim" not in st.session_state: st.session_state.last_sim = None
+if "current_user" not in st.session_state: st.session_state.current_user = None
+
+@st.dialog("Acceso a GeoMed")
+def show_auth_modal():
+    t_login, t_register = st.tabs(["🔑 Iniciar Sesión", "📝 Crear Cuenta"])
+    
+    with t_login:
+        st.markdown("<p style='font-size:0.9rem; color:#6B7280;'>Ingresa tus credenciales para acceder a tu cuenta.</p>", unsafe_allow_html=True)
+        email = st.text_input("Correo Electrónico", key="login_email")
+        password = st.text_input("Contraseña", type="password", key="login_pass")
+        if st.button("Iniciar Sesión", use_container_width=True):
+            try:
+                response = supabase.auth.sign_in_with_password({"email": email, "password": password})
+                user_name = response.user.user_metadata.get('name', email) if response.user else email
+                st.session_state.current_user = user_name
+                st.rerun()
+            except Exception as e:
+                err_msg = str(e)
+                if "Email not confirmed" in err_msg:
+                    st.error("Por favor, confirma tu correo electrónico antes de iniciar sesión.")
+                elif "Invalid login credentials" in err_msg:
+                    st.error("Credenciales incorrectas.")
+                else:
+                    st.error(f"Error al iniciar sesión: {err_msg}")
+                
+    with t_register:
+        st.markdown("<p style='font-size:0.9rem; color:#6B7280;'>Únete a GeoMed Intelligence para guardar tus análisis.</p>", unsafe_allow_html=True)
+        new_name = st.text_input("Nombre Completo", key="reg_name")
+        new_email = st.text_input("Correo Electrónico", key="reg_email")
+        new_password = st.text_input("Contraseña", type="password", key="reg_pass")
+        if st.button("Crear Cuenta", use_container_width=True, key="btn_register"):
+            if not new_email or not new_password or not new_name:
+                st.warning("Por favor, llena todos los campos.")
+            else:
+                try:
+                    response = supabase.auth.sign_up({
+                        "email": new_email, 
+                        "password": new_password,
+                        "options": {
+                            "data": {
+                                "name": new_name
+                            }
+                        }
+                    })
+                    st.success("Cuenta creada exitosamente. Revisa tu correo (si aplica) o intenta iniciar sesión.")
+                except Exception as e:
+                    err_msg = str(e)
+                    if "User already registered" in err_msg:
+                        st.error("El correo ya está registrado.")
+                    else:
+                        st.error(f"Error al registrar cuenta: {err_msg}")
+
 
 # --- CARGAS DE DATOS (REPROYECTADOS WGS84) ---
 @st.cache_data
@@ -666,6 +721,8 @@ def main():
         comunas_lista = sorted(comunas_lista, key=lambda x: int(x['id']) if x['id'].isdigit() else 99)
 
     with st.sidebar:
+
+
         st.markdown("## ⚙️ Panel de Control")
         opciones = [c['id'] for c in comunas_lista]
         idx = opciones.index(st.session_state.comuna_id) if st.session_state.comuna_id in opciones else 0
@@ -695,12 +752,15 @@ def main():
         """, unsafe_allow_html=True)
 
         st.divider()
-        st.markdown("""
-        <div style='text-align:center; opacity:0.6; font-size:0.8rem;'>
-            <p>GeoMed Intelligence v2.0</p>
-            <p>Hackathon Edition 🚀</p>
-        </div>
-        """, unsafe_allow_html=True)
+        # --- AUTENTICACIÓN ---
+        if st.session_state.current_user:
+            st.markdown(f"**👤 Hola, {st.session_state.current_user}**")
+            if st.button("🚪 Cerrar Sesión", use_container_width=True):
+                st.session_state.current_user = None
+                st.rerun()
+        else:
+            if st.button("🔑 Iniciar Sesión", use_container_width=True, type="primary"):
+                show_auth_modal()
 
     # Filtrar datos de la comuna seleccionada (ULTRA RÁPIDO con Pandas)
     poi_comuna = filter_df_by_comuna(all_pois_df, st.session_state.comuna_id)
