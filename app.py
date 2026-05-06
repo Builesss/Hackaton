@@ -8,7 +8,6 @@ import json
 import os
 from dotenv import load_dotenv
 from openai import OpenAI
-from services.data_client import get_comuna_context
 
 # Configuración de Streamlit
 st.set_page_config(page_title="GeoMed - Inteligencia Territorial", layout="wide", page_icon="🌍")
@@ -47,8 +46,9 @@ st.markdown("""
     }
     .metric-card-insights {
         background: #F0F9FF !important; /* Color azul suave informativo */
-        width: 280px;
-        margin-left: 20px;
+        width: 100%;
+        max-width: 100%;
+        box-sizing: border-box;
         border: 1px solid #BAE6FD !important;
         padding: 1rem;
         border-radius: 24px;
@@ -57,6 +57,8 @@ st.markdown("""
         margin-top: 4rem;
         text-align: center; /* Centrar contenido como solicitó el usuario */
         transition: all 0.4s ease;
+        overflow: hidden;
+        word-wrap: break-word;
     }
     .metric-card-insights:hover {
         background: #E0F2FE !important;
@@ -306,6 +308,47 @@ st.markdown("""
     }
     .app-footer span, .app-footer p { color: #9CA3AF !important; }
 
+    /* ===== RESPONSIVE: Sidebar open adjustments ===== */
+    /* Prevent fixed-width overflow in narrow containers */
+    .metric-card, .metric-card-insights, .kpi-card {
+        max-width: 100% !important;
+        box-sizing: border-box !important;
+    }
+
+    /* When sidebar is open, the main content area shrinks */
+    @media (max-width: 1200px) {
+        .metric-card-insights {
+            margin-top: 1.5rem;
+            padding: 0.8rem;
+        }
+        .metric-card-insights ul {
+            padding-left: 0.5rem !important;
+            padding-right: 0.5rem !important;
+        }
+        .hero-banner {
+            padding: 1.5rem 1.5rem;
+        }
+        .hero-banner h1 {
+            font-size: 2rem !important;
+        }
+        .stat-tile .stat-number {
+            font-size: 1.4rem !important;
+        }
+    }
+
+    @media (max-width: 900px) {
+        .metric-card-insights {
+            margin-top: 1rem;
+            padding: 0.6rem;
+        }
+        .hero-banner {
+            padding: 1rem;
+        }
+        .hero-banner h1 {
+            font-size: 1.6rem !important;
+        }
+    }
+
 </style>
 """, unsafe_allow_html=True)
 
@@ -407,6 +450,20 @@ def load_attractions():
 def load_tur_info():
     path = "data/wgs84_puntos_de_informacion_tur.geojson"
     if not os.path.exists(path): return None
+    with open(path, "r", encoding="utf-8") as f: return json.load(f)
+
+# Cargar Población
+@st.cache_data
+def load_poblacion():
+    path = "data/poblacion_comunas.json"
+    if not os.path.exists(path): return {}
+    with open(path, "r", encoding="utf-8") as f: return json.load(f)
+
+# Cargar Estratos (Preprocesado)
+@st.cache_data
+def load_estratos():
+    path = "data/estratos_resumen.json"
+    if not os.path.exists(path): return {}
     with open(path, "r", encoding="utf-8") as f: return json.load(f)
 
 def filter_df_by_comuna(df, comuna_id):
@@ -519,10 +576,25 @@ def prepare_market_snapshot(comuna_id, cnombres, poi_df, metro_data, attraction_
         a_filtered = filter_geojson_by_comuna(attraction_data['features'], comuna_id)
         att_list = [f"{f['properties'].get('nombre_sitio')} ({f['properties'].get('tipo_atractivo')})" for f in a_filtered]
 
+    # 5. Demografía y Socioeconomía
+    poblacion = 0
+    estrato = "N/A"
+    try:
+        pob_data = load_poblacion()
+        est_data = load_estratos()
+        if str(comuna_id) in pob_data:
+            poblacion = pob_data[str(comuna_id)].get("poblacion", 0)
+        if str(comuna_id) in est_data:
+            estrato = est_data[str(comuna_id)].get("estrato_predominante", "N/A")
+    except Exception:
+        pass
+
     snapshot = {
         "ubicacion": {
             "comuna_id": comuna_id,
-            "nombre": cnombres.get(comuna_id, "Desconocida")
+            "nombre": cnombres.get(comuna_id, "Desconocida"),
+            "poblacion_habitantes": poblacion,
+            "estrato_predominante": estrato
         },
         "indicadores_mercado": {
             "total_establecimientos": stats['total'],
@@ -545,6 +617,8 @@ def main():
     metro_data = load_metro_geojson()
     attraction_data = load_attractions()
     tur_info_data = load_tur_info()
+    poblacion_data = load_poblacion()
+    estratos_data = load_estratos()
 
     # Calcular estadísticas globales para el hero
     total_pois = len(all_pois_df) if isinstance(all_pois_df, pd.DataFrame) else 0
@@ -571,8 +645,8 @@ def main():
                 <div class='stat-label'>Estaciones de Metro</div>
             </div>
             <div class='stat-tile'>
-                <div class='stat-number'>{total_atractivos}</div>
-                <div class='stat-label'>Atractivos Turísticos</div>
+                <div class='stat-number'>{sum([v.get('poblacion', 0) for v in poblacion_data.values()]):,}</div>
+                <div class='stat-label'>Población Total</div>
             </div>
         </div>
     </div>
@@ -720,7 +794,7 @@ def main():
                 tooltip=folium.GeoJsonTooltip(fields=['sitio', 'direccion'], aliases=['ℹ️ Punto Info:', 'Dir:'])
             ).add_to(m)
         
-        folium.LayerControl(collapsed=False, position='topright').add_to(m)
+        folium.LayerControl(collapsed=True, position='topright').add_to(m)
             
         map_event = st_folium(
             m, 
@@ -777,16 +851,23 @@ def main():
 
         # 3. Panel Inferior (3 columnas: Contexto, Infraestructura, IA)
         st.markdown("")
-        col_info, col_infra, col_ai = st.columns([1, 1, 2])
+        col_info, col_infra, col_ai = st.columns([1.2, 1.2, 1.8])
         
         with col_info:
             st.markdown("### 📍 Entorno Local")
             if st.session_state.comuna_id:
+                cid_str = str(st.session_state.comuna_id)
+                poblacion_local = poblacion_data.get(cid_str, {}).get("poblacion", "N/A")
+                if isinstance(poblacion_local, int): poblacion_local = f"{poblacion_local:,}"
+                estrato_local = estratos_data.get(cid_str, {}).get("estrato_predominante", "N/A")
+                
                 st.markdown(f"""<div class='metric-card'>
                     <b style='font-size:1.2rem;'>Comuna {st.session_state.comuna_id}</b><br>
                     <span style='color:#6B7280 !important;'>{cnombres.get(st.session_state.comuna_id, '')}</span><br><br>
                     <span style='font-size:0.85rem; color:#4B6741 !important;'>Sector dominante:</span><br>
-                    <b>{stats['top_cat'][:25] if stats['top_cat'] != 'N/A' else 'Sin datos'}</b>
+                    <b>{stats['top_cat'][:25] if stats['top_cat'] != 'N/A' else 'Sin datos'}</b><br><br>
+                    <span style='font-size:0.85rem; color:#4B6741 !important;'>Población:</span> <b>{poblacion_local}</b> hab.<br>
+                    <span style='font-size:0.85rem; color:#4B6741 !important;'>Estrato predominante:</span> <b>{estrato_local}</b>
                 </div>""", unsafe_allow_html=True)
                 st.info("💡 Haz clic en una comuna del mapa para cambiar el contexto.")
         
@@ -797,7 +878,7 @@ def main():
                 <p style='font-size:0.85rem; line-height:1.4; color:#4B5563;'>
                     Cruza variables críticas en tiempo real:
                 </p>
-                <ul style='font-size:0.8rem; list-style-type: none; color:#6B7280; padding-right:1rem;'>
+                <ul style='font-size:0.8rem; list-style-type: none; color:#6B7280; padding-left:0; padding-right:1rem;'>
                     <li>📍 Proximidad a estaciones de <b>Metro</b>.</li>
                     <li>🎭 Puntos de <b>interés turístico</b></li>
                     <li>🏪 Densidad de <b>comercios actuales</b>.</li>
@@ -810,7 +891,9 @@ def main():
         with col_ai:
             if st.session_state.comuna_id:
                 st.markdown("### 🤖 Inteligencia Territorial")
-                if st.button("🚀 Generar Insights Estratégicos", use_container_width=True):
+                btn_placeholder = st.empty()
+                if btn_placeholder.button("🚀 Generar Insights Estratégicos", use_container_width=True):
+                    btn_placeholder.button("⏳ Analizando micro-entorno con IA...", disabled=True, use_container_width=True)
                     inf_cercanos = filter_geojson_by_comuna(tur_info_data['features'], st.session_state.comuna_id) if tur_info_data else []
                     
                     extra = {
@@ -819,10 +902,8 @@ def main():
                         "puntos_info": [i['properties'].get('sitio') for i in inf_cercanos],
                         "conteo_comercios_actuales": len(poi_comuna) if not poi_comuna.empty else 0
                     }
-                    
-                    context = get_comuna_context(st.session_state.comuna_id, "Desconocida", extra_context=extra)
                     try:
-                        with st.spinner("Analizando micro-entorno con IA..."):
+                        with st.spinner("Procesando Inteligencia Territorial..."):
                             snapshot = prepare_market_snapshot(st.session_state.comuna_id, cnombres, poi_comuna, metro_data, attraction_data)
                             
                             SYSTEM_INSTRUCTION_RADAR = (
@@ -838,8 +919,10 @@ def main():
                             user_prompt = f"<SNAPSHOT_TERRITORIAL>\n{json.dumps(snapshot, indent=2)}\n</SNAPSHOT_TERRITORIAL>\n\nGenera el análisis estratégico."
                             res = generate_ai_content(user_prompt, SYSTEM_INSTRUCTION_RADAR)
                             st.session_state.radar_insight = res
+                            st.rerun()
                     except Exception as e:
                         st.warning("🏮 El motor analítico está saturado. Por favor, reintenta en unos segundos.")
+                        btn_placeholder.button("🚀 Generar Insights Estratégicos", use_container_width=True, key="btn_radar_error")
                 
                 if st.session_state.radar_insight:
                     with st.container(height=300, border=True):
@@ -860,13 +943,13 @@ def main():
         elif stats:
             st.markdown(f"### 📊 Dashboard de Inteligencia — Comuna {st.session_state.comuna_id} · {cnombres.get(st.session_state.comuna_id, '')}")
             
-            # 4 KPI Cards
-            k1, k2, k3, k4 = st.columns(4)
+            # 4 KPI Cards -> Change to 6 to fit Demographic data
+            k1, k2, k3, k4, k5, k6 = st.columns(6)
             with k1:
                 st.markdown(f"""<div class='kpi-card'>
                     <div class='kpi-icon'>🏪</div>
-                    <div class='kpi-value'>{stats['total']:,}</div>
-                    <div class='kpi-label'>Establecimientos</div>
+                    <div class='kpi-value' style='font-size:1.2rem !important;'>{stats['total']:,}</div>
+                    <div class='kpi-label'>Comercios</div>
                 </div>""", unsafe_allow_html=True)
             with k2:
                 top_display = stats['top_cat'][:18] if stats['top_cat'] != 'N/A' else 'N/A'
@@ -879,15 +962,29 @@ def main():
                 n_sect = len(stats['dist'])
                 st.markdown(f"""<div class='kpi-card'>
                     <div class='kpi-icon'>📂</div>
-                    <div class='kpi-value'>{n_sect}</div>
-                    <div class='kpi-label'>Categorías Activas</div>
+                    <div class='kpi-value' style='font-size:1.2rem !important;'>{n_sect}</div>
+                    <div class='kpi-label'>Categorías</div>
                 </div>""", unsafe_allow_html=True)
             with k4:
                 density = round(stats['total'] / max(len(filter_geojson_by_comuna(all_barrios['features'], st.session_state.comuna_id)) if all_barrios else 1, 1))
                 st.markdown(f"""<div class='kpi-card'>
                     <div class='kpi-icon'>📈</div>
-                    <div class='kpi-value'>{density:,}</div>
-                    <div class='kpi-label'>Densidad / Barrio</div>
+                    <div class='kpi-value' style='font-size:1.2rem !important;'>{density:,}</div>
+                    <div class='kpi-label'>Com./Barrio</div>
+                </div>""", unsafe_allow_html=True)
+            with k5:
+                pob = poblacion_data.get(str(st.session_state.comuna_id), {}).get("poblacion", 0)
+                st.markdown(f"""<div class='kpi-card'>
+                    <div class='kpi-icon'>👥</div>
+                    <div class='kpi-value' style='font-size:1.2rem !important;'>{pob:,}</div>
+                    <div class='kpi-label'>Población</div>
+                </div>""", unsafe_allow_html=True)
+            with k6:
+                est = estratos_data.get(str(st.session_state.comuna_id), {}).get("estrato_predominante", "N/A")
+                st.markdown(f"""<div class='kpi-card'>
+                    <div class='kpi-icon'>🏠</div>
+                    <div class='kpi-value' style='font-size:1.2rem !important;'>{est}</div>
+                    <div class='kpi-label'>Estrato</div>
                 </div>""", unsafe_allow_html=True)
             
             st.divider()
@@ -998,8 +1095,10 @@ def main():
                 idea = st.text_area("¿Cuál es tu propuesta de negocio?", placeholder="Ej: Venta de comida saludable cerca de la estación Estadio...", height=150)
                 sim_comuna = st.selectbox("Comuna de Simulación:", opciones, format_func=lambda x: f"C{x} - {cnombres.get(x, '')}", key="sim_sel", index=idx)
                 
-                if st.button("🚀 Calcular Probabilidad de Éxito", use_container_width=True):
+                btn_sim_placeholder = st.empty()
+                if btn_sim_placeholder.button("🚀 Calcular Probabilidad de Éxito", use_container_width=True):
                     if idea:
+                        btn_sim_placeholder.button("⏳ Consultando simulador de inteligencia territorial...", disabled=True, use_container_width=True)
                         p_sim = filter_df_by_comuna(all_pois_df, sim_comuna)
                         m_sim = filter_geojson_by_comuna(metro_data['features'], sim_comuna) if metro_data else []
                         
@@ -1011,7 +1110,7 @@ def main():
                         }
                         
                         try:
-                            with st.spinner("Consultando algoritmos de inteligencia territorial..."):
+                            with st.spinner("Procesando simulación predictiva..."):
                                 snapshot_sim = prepare_market_snapshot(sim_comuna, cnombres, p_sim, metro_data, attraction_data)
                                 
                                 SYSTEM_INSTRUCTION_SIMULATOR = (
@@ -1030,8 +1129,10 @@ def main():
                                 sim_prompt = f"IDEA A EVALUAR: {idea}\n\n<SNAPSHOT_LOCAL>\n{json.dumps(snapshot_sim, indent=2)}\n</SNAPSHOT_LOCAL>"
                                 sim_resp = generate_ai_content(sim_prompt, SYSTEM_INSTRUCTION_SIMULATOR)
                                 st.session_state.last_sim = sim_resp
+                                st.rerun()
                         except Exception as e:
                             st.warning("⚠️ Error de cuota: El simulador está saturado. Reintenta en breve.")
+                            btn_sim_placeholder.button("🚀 Calcular Probabilidad de Éxito", use_container_width=True, key="btn_sim_error")
                     else:
                         st.warning("Por favor, describe tu idea para realizar la simulación.")
                 
@@ -1078,16 +1179,29 @@ def main():
             with sq2:
                 st.markdown("<div class='suggestion-chip'>🚇 ¿Cómo influye el Metro en los negocios?</div>", unsafe_allow_html=True)
                 st.markdown("<div class='suggestion-chip'>💰 ¿Cuánto capital necesito para emprender aquí?</div>", unsafe_allow_html=True)
-        for msg in st.session_state.messages:
-            with st.chat_message(msg["role"]): st.markdown(msg["content"])
         
-        st.write("") # Espaciador al final del contenedor
+        # Contenedor para los mensajes del chat
+        chat_container = st.container()
         
-        if prompt := st.chat_input("Pregúntale a DataMede sobre el mercado..."):
+        with chat_container:
+            for msg in st.session_state.messages:
+                with st.chat_message(msg["role"]): st.markdown(msg["content"])
+        
+        st.write("") # Espaciador
+        
+        is_processing = st.session_state.get("chat_processing", False)
+        
+        prompt = st.chat_input("Pregúntale a DataMede sobre el mercado...", disabled=is_processing)
+        
+        if prompt:
             st.session_state.messages.append({"role": "user", "content": prompt})
-            with st.chat_message("user"): st.markdown(prompt)
+            st.session_state.chat_processing = True
+            st.rerun()
             
-            if client:
+        if is_processing and client:
+            # Añadimos el estado de carga DENTRO del contenedor de mensajes
+            # para que aparezca arriba del input y no lo desplace
+            with chat_container:
                 with st.chat_message("assistant"):
                     with st.spinner("Analizando..."):
                         snapshot_chat = prepare_market_snapshot(st.session_state.comuna_id, cnombres, poi_comuna, metro_data, attraction_data)
@@ -1103,9 +1217,8 @@ def main():
                         )
                         
                         messages = [{"role": "system", "content": SYSTEM_INSTRUCTION_CHATBOT}]
-                        for m in st.session_state.messages[:-1]:
+                        for m in st.session_state.messages:
                             messages.append({"role": m["role"], "content": m["content"]})
-                        messages.append({"role": "user", "content": prompt})
                         
                         res_text = "Error: No se pudo obtener respuesta."
                         for m_id in MODELS:
@@ -1120,8 +1233,10 @@ def main():
                                 if "429" in str(e): continue
                                 res_text = f"Error: {e}"
                                 break
-                        st.markdown(res_text)
+                        
                         st.session_state.messages.append({"role": "assistant", "content": res_text})
+                        st.session_state.chat_processing = False
+                        st.rerun()
 
     # ===== FOOTER =====
     st.markdown("""

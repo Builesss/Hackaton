@@ -1,0 +1,18 @@
+{
+  "1":  { "nombre": "Popular",           "poblacion": 129543 },
+  "2":  { "nombre": "Santa Cruz",        "poblacion": 111624 },
+  "3":  { "nombre": "Manrique",          "poblacion": 162118 },
+  "4":  { "nombre": "Aranjuez",          "poblacion": 161845 },
+  "5":  { "nombre": "Castilla",          "poblacion": 121562 },
+  "6":  { "nombre": "Doce de Octubre",   "poblacion": 172310 },
+  "7":  { "nombre": "Robledo",           "poblacion": 198347 },
+  "8":  { "nombre": "Villa Hermosa",     "poblacion": 142056 },
+  "9":  { "nombre": "Buenos Aires",      "poblacion": 153421 },
+  "10": { "nombre": "La Candelaria",     "poblacion": 84213 },
+  "11": { "nombre": "Laureles Estadio",  "poblacion": 123457 },
+  "12": { "nombre": "La América",        "poblacion": 97842 },
+  "13": { "nombre": "San Javier",        "poblacion": 163892 },
+  "14": { "nombre": "El Poblado",        "poblacion": 135671 },
+  "15": { "nombre": "Guayabal",          "poblacion": 98234 },
+  "16": { "nombre": "Belén",             "poblacion": 217501 }
+}
